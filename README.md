@@ -9,6 +9,7 @@ description matches the task at hand.
 
 | Skill | What it does | Evals |
 |-------|--------------|-------|
+| [`daily-tech-digest`](daily-tech-digest/SKILL.md) | Fetches and summarizes daily AI/tech news from US, China, GitHub Trending, HuggingFace, and arXiv into an interactive HTML digest with search, keyword filtering, dark mode, and bilingual titles. | ✅ |
 | [`markdown-to-sdd-knowledge`](markdown-to-sdd-knowledge/SKILL.md) | Converts unstructured markdown (PRDs, feature requests, meeting notes, Slack threads) into structured, atomic knowledge files for Spec-Driven Development workflows. | ✅ |
 
 ## How it works

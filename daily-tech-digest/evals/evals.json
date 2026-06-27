@@ -1,0 +1,49 @@
+{
+  "skill_name": "daily-tech-digest",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Give me today's AI and tech news digest — fetch from the usual sources and generate the interactive HTML page.",
+      "expected_output": "An HTML file saved to ~/Desktop/news-digest/YYYY-MM-DD.html with interactive digest including stats dashboard, daily keywords, collapsible sections (Highlights, US News, China News, GitHub Trending, HuggingFace Trending, arXiv), and color-coded keyword pills. Every item has a bilingual title (English + Chinese), 3-5 keywords with domain assignments, a 1-2 sentence summary, and a verified source link.",
+      "files": [],
+      "expectations": [
+        "HTML file exists at ~/Desktop/news-digest/YYYY-MM-DD.html",
+        "Processed JSON saved before HTML generation",
+        "Total items capped at 25",
+        "Highlights has at most 10 items",
+        "Every item has title_zh (Chinese translation)",
+        "Every item has keywords with domain assignments",
+        "Every item has a source URL",
+        "Sources section at bottom lists all origin URLs",
+        "No fabricated content"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I need a digest that includes Chinese tech news from 36kr and Huxiu. Keep the Chinese content in the original language — don't translate the summaries. But make all titles bilingual.",
+      "expected_output": "An HTML digest where Chinese content items have bilingual titles (English / 中文), summaries in original Chinese, and Chinese keywords. English items also get Chinese translations of their titles.",
+      "files": [],
+      "expectations": [
+        "Chinese items have bilingual titles (English / 中文)",
+        "Chinese content summaries are in original Chinese (not translated to English)",
+        "Chinese keywords use Chinese text (e.g. 大模型 not llm for ZH items)",
+        "English items have title_zh with Chinese translation",
+        "HTML renders both languages correctly"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Give me a tech news digest, but exclude any crypto or blockchain speculation. Also, if there's no genuinely major news today (new model releases, major acquisitions, scandals, etc.), don't include a Highlights section. Don't fabricate items to fill space. Cap at 25 total.",
+      "expected_output": "An HTML digest with no cryptocurrency/DeFi/NFT items. The Highlights section is either omitted entirely (if no qualifying major news) or contains only truly significant items. Total items capped at 25, with no fabricated entries.",
+      "files": [],
+      "expectations": [
+        "No cryptocurrency, DeFi, or NFT items in output",
+        "Highlights section exists only if qualifying major news is present",
+        "Highlights items are genuinely significant (model releases, major product launches, scandals, $1B+ deals)",
+        "Total items is at most 25",
+        "No fabricated items — sparse sources result in fewer items, not invented ones",
+        "All links verified (link_verified: true for every item)"
+      ]
+    }
+  ]
+}
