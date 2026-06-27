@@ -1,0 +1,51 @@
+{
+  "skill_name": "markdown-to-sdd-knowledge",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I have a feature request document at evals/files/offline-queue-prd.md for adding an offline queue to our warehouse inventory scanner app. Please extract the SDD knowledge from it — create the structured knowledge files (index.md, requirements.md, approach.md, etc.) in a knowledge/ directory. Do NOT fabricate any requirements or information that isn't in the source document.",
+      "expected_output": "A knowledge/ directory with index.md, requirements.md, approach.md, ux-ui.md (since the source mentions UI banner), gaps.md, and supplementary.md containing all facts from the PRD with no fabricated content.",
+      "files": ["evals/files/offline-queue-prd.md"],
+      "expectations": [
+        "knowledge/index.md exists",
+        "knowledge/requirements.md exists with functional requirements",
+        "knowledge/approach.md exists and mentions tech stack (Kotlin/Compose/Room)",
+        "knowledge/ux-ui.md exists (source has UI content)",
+        "knowledge/gaps.md exists with concrete questions",
+        "knowledge/supplementary.md exists with out-of-scope info",
+        "No fabricated requirements: output does NOT contain invented features",
+        "Preserves timeline: mentions September 30 or Q3",
+        "Source cited for requirements"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Here's a feature request I got on Slack. Extract the SDD knowledge from it into structured knowledge files:\n\n---\nok so my boss just sent me this xlsx file (its in my downloads, called something like 'Q4 sales final FINAL v2.xlsx') and she wants me to add a column that shows the profit margin as a percentage. The revenue is in column C and costs are in column D i think\n---\n\nCreate the knowledge files in a knowledge/ directory. Don't fabricate — only include what's actually in the source.",
+      "expected_output": "A knowledge/ directory with index.md, requirements.md, approach.md (likely sparse), gaps.md, and supplementary.md. ux-ui.md should NOT be created since there's no UI content. Many gaps due to minimal input — missing info should be surfaced as concrete questions in gaps.md.",
+      "files": [],
+      "expectations": [
+        "knowledge/index.md exists",
+        "knowledge/ux-ui.md does NOT exist (no UI in source)",
+        "knowledge/gaps.md exists with many gaps (sparse input)",
+        "requirements.md mentions profit margin",
+        "requirements.md mentions columns C and D",
+        "No fabricated requirements: output does NOT add unmentioned features",
+        "Output acknowledges uncertainty"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "I have sprint planning notes at evals/files/sprint-planning-notes.md. This doc covers multiple features. I want you to extract the SDD knowledge specifically for the 'Dark Mode Toggle' feature (the first agenda item). Ignore the other features for now — focus only on what the meeting notes say about dark mode. Create the structured knowledge files in a knowledge/ directory. Don't fabricate.",
+      "expected_output": "A knowledge/ directory with knowledge extracted only about Dark Mode Toggle (not Search Autocomplete or Newsletter). Should include ux-ui.md since Diana's Figma mockups are mentioned. Must include supplementary info like stakeholder comments and action items. No content about other features should leak in.",
+      "files": ["evals/files/sprint-planning-notes.md"],
+      "expectations": [
+        "knowledge/ux-ui.md exists (Figma mockups mentioned)",
+        "Scope isolation: output does NOT mention Search Autocomplete",
+        "Scope isolation: output does NOT mention Newsletter",
+        "knowledge/approach.md mentions CSS custom properties or tokens.css",
+        "knowledge/supplementary.md mentions stakeholder info",
+        "Output mentions Figma link"
+      ]
+    }
+  ]
+}
