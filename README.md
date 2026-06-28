@@ -10,7 +10,9 @@ description matches the task at hand.
 | Skill | What it does | Evals |
 |-------|--------------|-------|
 | [`daily-tech-digest`](daily-tech-digest/SKILL.md) | Fetches and summarizes daily AI/tech news from US, China, GitHub Trending, HuggingFace, and arXiv into an interactive HTML digest with search, keyword filtering, dark mode, and bilingual titles. | ✅ |
+| [`gitignore-hardening`](gitignore-hardening/SKILL.md) | Audits and hardens `.gitignore` to prevent leaking secrets and sensitive info (keystores, .env files, API keys, credentials), and stops tracking files that were already committed. | — |
 | [`markdown-to-sdd-knowledge`](markdown-to-sdd-knowledge/SKILL.md) | Converts unstructured markdown (PRDs, feature requests, meeting notes, Slack threads) into structured, atomic knowledge files for Spec-Driven Development workflows. | ✅ |
+| [`spec-driven-development`](spec-driven-development/SKILL.md) | Sets up a spec-driven development workflow in any project with `specs/` folder structure, `MEMORY.md`, and `AGENTS.md` integration so AI tools follow a write-spec-before-code workflow. | — |
 
 ## How it works
 
