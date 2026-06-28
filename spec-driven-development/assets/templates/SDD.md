@@ -1,0 +1,72 @@
+# Spec-Driven Development Workflow
+
+## Phases
+
+1. **Spec** — Write plan.md + spec.md + UX mockups. Review with stakeholder.
+2. **Plan** — Break into tasks.md + test_plan.md. Estimate and order.
+3. **Build** — Implement one task per commit. Verify build + tests at each commit.
+4. **Ship** — Write takeaways.md. Merge to MEMORY.md.
+
+## Skills to Use
+
+### Spec Writing Phase
+- **`doc-coauthoring`**: Invoke when starting spec.md or plan.md. Enforces a
+  describe → review → approve → iterate loop. Prevents guessing requirements.
+
+### Mockup Generation Phase
+- **`canvas-design` + `theme-factory`**: Invoke when user describes a feature
+  but has NO mockup. `canvas-design` generates visual layout; `theme-factory`
+  applies the project's existing color scheme. Output to ux-ui/.
+  Skip when user provides real screenshots — AI reads them natively.
+
+### Interactive Prototyping Phase (optional)
+- **`frontend-design`**: When feature has complex interaction logic (navigation
+  flow, state transitions). Generates HTML/React prototype.
+- **`webapp-testing`**: Verifies HTML prototype interactions with Playwright.
+  Use when: feature has >= 3 screens or multi-step flows that would be
+  expensive to get wrong in native code.
+
+### Reading Provided Screenshots
+- No skill needed. AI reads real UI screenshots natively. Only use when the
+  user provides actual images of their intended UI.
+
+### Test Plan Authoring
+- No skill needed. Apply standard practices:
+  - AAA pattern (Arrange-Act-Assert)
+  - Boundary testing
+  - Equivalence partitioning
+  Reference project-specific testing conventions.
+
+## Skill Invocation Order
+
+```
+Feature Request Received
+│
+├── User has mockup?
+│   ├── YES → AI reads natively → spec writing
+│   └── NO  → canvas-design + theme-factory → generate mockup
+│
+├── doc-coauthoring → co-write spec.md + plan.md
+│
+├── Complex flow (>= 3 screens)?
+│   ├── YES → frontend-design → HTML prototype
+│   │         └── webapp-testing → verify interactions
+│   └── NO  → skip
+│
+└── Implementation → tasks.md → one commit per task
+```
+
+## Conventions
+
+- Folder names: `NNN-short-kebab-name/` (e.g., `001-user-auth/`)
+- NNN is zero-padded sequential ID (001, 002, ...)
+- Statuses: 📋 Planned → 🚧 In Progress → ✅ Done → 📦 Archived
+- One task = one independent, build-verifiable, test-passing commit
+- File conflicts surface via `touches` field in plan.md frontmatter + index.md
+
+## Build & Test Commands
+
+- Build: `{project_build_cmd}`
+- Test: `{project_test_cmd}`
+
+These commands are used in tasks.md for each task's verification step.
