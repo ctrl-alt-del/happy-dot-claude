@@ -1,0 +1,143 @@
+---
+name: sdd-feature-builder
+description: >
+  Implements a new feature end-to-end using a project's existing spec-driven
+  development (SDD) workflow: loads project context and MEMORY, assigns the next
+  NNN feature folder under specs/, co-authors spec.md + plan.md, writes
+  test_plan.md + tasks.md, implements one commit per task with build/test/lint
+  verification, then writes takeaways.md, promotes learnings to MEMORY.md, and
+  updates specs/index.md. Use this WHENEVER the user asks to build, add, create,
+  or implement a feature, screen, endpoint, or capability in a repo that already
+  has SDD set up (a specs/SDD.md or specs/_template/ exists) — even if they just
+  say "add feature X", "implement Y", "build the Z screen", or "new feature" and
+  never mention specs. If the project has NO SDD scaffolding yet, defer to the
+  `spec-driven-development` skill to set it up first. This skill EXECUTES the
+  per-feature workflow; it is distinct from `spec-driven-development` (which only
+  sets up the scaffolding) and from `markdown-to-sdd-knowledge` (which converts
+  loose markdown into knowledge files).
+---
+
+# SDD Feature Builder
+
+Drive a single feature from request to shipped using the project's own
+spec-driven development workflow. One feature = one `specs/NNN-name/` folder.
+One task = one commit that builds and passes tests.
+
+This skill **consumes** the SDD scaffolding that the `spec-driven-development`
+skill creates (`specs/SDD.md`, `specs/_template/`, `MEMORY.md`,
+`specs/index.md`). It does not duplicate templates — it copies the project's
+`specs/_template/` for each new feature.
+
+## Step 0 — Load context (always, before anything else)
+
+Read, in this order, and let them shape every later step:
+
+1. `AGENTS.md` or `CLAUDE.md` — project conventions, build/test/lint commands.
+2. `specs/SDD.md` — the project's workflow + which helper skills to use.
+3. `MEMORY.md` — search for `#tags` relevant to the feature (`#api`, `#ui`,
+   `#build`, `#security`, …). Treat `⚡` entries as non-negotiable guardrails.
+4. `specs/index.md` — existing features, statuses, and the `touches` column
+   (file-conflict detection) plus `depends_on`.
+
+Determine the **build**, **test**, and **lint** commands from these docs (e.g.
+`./gradlew assembleDebug` / `testDebug` / `lint`, or `npm run build` / `test` /
+`lint`). You will run them on every task.
+
+## Step 1 — Precondition check
+
+If `specs/SDD.md` or `specs/_template/` is missing, the project is not set up
+for SDD. **Stop and invoke the `spec-driven-development` skill first**, then
+return here.
+
+## Step 2 — Scope the feature and assign an ID
+
+- Pick the next **zero-padded sequential** `NNN` (max existing ID in
+  `specs/index.md` / `specs/` + 1).
+- Choose a short kebab name: `NNN-short-kebab-name/`.
+- Create `specs/NNN-short-kebab-name/` by copying the project's
+  `specs/_template/` contents (including the empty `ux-ui/`).
+- Cross-check the `touches` column in `index.md`: if another in-flight feature
+  touches the same files, flag the conflict to the user before proceeding.
+
+## Step 3 — Mockups (only if the feature has UI and the user gave none)
+
+If the feature is visual and no mockup/screenshot was provided, use
+`canvas-design` + `theme-factory` (applying the project's design system from
+`specs/SDD.md`) to generate mockups into the feature's `ux-ui/`. If the user
+provided screenshots, read them natively — no skill needed. Skip entirely for
+CLI/API/back-end features.
+
+## Step 4 — Co-author spec.md + plan.md
+
+Use the `doc-coauthoring` skill to run a describe → review → approve → iterate
+loop. Do not guess requirements.
+
+- `spec.md` — user story, UX/UI (or API/CLI contract), acceptance criteria
+  (happy path + edge cases), non-functional requirements.
+- `plan.md` — fill the YAML frontmatter completely and keep it machine-parseable:
+  `feature_id`, `name`, `status`, `depends_on`, `touches` (every file you expect
+  to create/change), `created`. Body: approach, files table, risks,
+  dependencies, and any ADR.
+
+Get explicit approval on spec.md + plan.md before writing code.
+
+## Step 5 — Write test_plan.md + tasks.md
+
+- `test_plan.md` — AAA (Arrange-Act-Assert), boundary/equivalence cases. Push
+  logic into testable units so most coverage lands in fast unit tests; note any
+  parts only coverable by instrumented/integration tests.
+- `tasks.md` — break the work into tasks where **one task = one independent,
+  build-verifiable, test-passing commit**. Order by dependency. Each task lists
+  its verification commands.
+
+## Step 6 — Implement (one commit per task)
+
+For each task, run the loop in `references/implementation-loop.md`:
+implement → run build + test + lint → fix → commit (matching the repo's commit
+message style) → mark the task done. Keep **exactly one** task in progress at a
+time. Before writing code that touches a known-risky area, re-check the relevant
+`MEMORY.md` `#tag` so you don't repeat a logged bug.
+
+Respect the user's commit preference: only commit when the project's workflow
+expects per-task commits or the user has asked for it. If unsure, batch the work
+and confirm before committing.
+
+## Step 7 — Ship
+
+Follow `references/ship-checklist.md`:
+
+1. Write `takeaways.md` (what went well, what we learned, surprises, reusable
+   patterns).
+2. Promote durable findings into `MEMORY.md` — tagged (`#api`/`#ui`/`#build`/
+   `#security`), `⚡` for critical guardrails — and update the Code Ownership Map
+   + Common Bugs Fixed.
+3. Update `specs/index.md`: set the feature's status (`✅ Done`) and `touches`;
+   bump `last_updated`.
+4. Flip `plan.md` `status` to match.
+5. If `AGENTS.md` has a code-ownership map or "known gaps" note, update it.
+
+## Guardrails
+
+- Keep `specs/` separate from permanent `docs/`. Never merge them.
+- Feature IDs are zero-padded and sequential; never reuse an ID.
+- `MEMORY.md` is project-wide, not per-feature. Read it before specs; curate into
+  it after ship.
+- One task = one commit; build + test must pass per task. If a task is blocked or
+  partial, keep it in progress and add a follow-up task describing the blocker —
+  never mark it done on intent.
+- Never commit secrets. Honor the repo's existing commit-message convention.
+- Do not invent requirements — drive spec.md/plan.md through `doc-coauthoring`.
+
+## Collaborating skills
+
+- `doc-coauthoring` — spec.md + plan.md authoring (required).
+- `canvas-design` + `theme-factory` — mockups for UI features without one.
+- `webapp-testing` — verify HTML prototypes / multi-screen flows when useful.
+- `spec-driven-development` — run first if the project lacks SDD scaffolding.
+
+## References
+
+- `references/implementation-loop.md` — the per-task implement/verify/commit loop,
+  commit conventions, and how to handle test failures and partial tasks.
+- `references/ship-checklist.md` — the phase checklist and the ship checklist
+  (takeaways → MEMORY promotion, index/plan/AGENTS updates).
