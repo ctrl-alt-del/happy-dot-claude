@@ -114,7 +114,10 @@ example):
 - [ ] No secrets, credentials, or malware; behavior matches the description
       (principle of least surprise).
 
-## Reference example
+## Reference examples
 
-`markdown-to-sdd-knowledge/` is a complete, well-formed skill (frontmatter,
-`references/`, `evals/`). Use it as the template when authoring new skills.
+- `markdown-to-sdd-knowledge/` is a complete, well-formed skill (frontmatter,
+  `references/`, `evals/`). Use it as the template when authoring new skills.
+- `codebase-to-sdd-knowledge/` demonstrates `scripts/` (deterministic helper
+  tools), a multi-phase workflow, and language-specific reference files — a
+  more advanced skill structure for complex analysis workflows.

@@ -37,10 +37,22 @@
   - Equivalence partitioning
   Reference project-specific testing conventions.
 
+### Codebase Knowledge Generation
+- **`codebase-to-sdd-knowledge`**: Invoke when there is existing code but no
+  `knowledge/` directory or when `MEMORY.md` is sparse. Analyzes the codebase
+  to produce structured knowledge files (`knowledge/`) and populate `MEMORY.md`
+  with durable findings from actual code and git history — not templates. Run
+  once during SDD setup and re-run when the codebase structure changes
+  significantly.
+
 ## Skill Invocation Order
 
 ```
 Feature Request Received
+│
+├── knowledge/ directory exists and is recent?
+│   ├── YES → proceed
+│   └── NO  → codebase-to-sdd-knowledge → generate knowledge/ + populate MEMORY.md
 │
 ├── User has mockup?
 │   ├── YES → AI reads natively → spec writing

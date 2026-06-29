@@ -24,8 +24,14 @@
 Before writing any spec, read in order:
 1. `AGENTS.md` or `CLAUDE.md` — project conventions
 2. `specs/SDD.md` — SDD workflow
-3. `MEMORY.md` — search for relevant #tags
-4. `specs/index.md` — check for feature file conflicts
+3. `knowledge/index.md` — if `knowledge/` directory exists, read the index for
+   architecture, data models, APIs, patterns, and gotchas. Traverse any domain
+   files relevant to the feature.
+4. `MEMORY.md` — search for relevant #tags
+5. `specs/index.md` — check for feature file conflicts
+
+If the project has no `knowledge/` directory but has existing source code, run
+`codebase-to-sdd-knowledge` first to generate it.
 
 After shipping a feature:
 1. Write `takeaways.md` in the feature folder

@@ -17,10 +17,12 @@ Sets up a complete spec-driven development workflow in any project. Creates the
 folder structure, templates, and AGENTS.md integration so AI tools follow a
 write-spec-before-code process for every feature.
 
-> **Related skill:** this skill only *sets up* the scaffolding. To actually build
-> a feature against an already-set-up workflow, use the `sdd-feature-builder`
-> skill, which assigns the next `NNN` spec folder, co-authors spec + plan, and
-> implements one commit per task through to takeaways and `MEMORY.md`.
+> **Related skills:**
+> - This skill only *sets up* the scaffolding. To actually build a feature,
+>   use the `sdd-feature-builder` skill.
+> - To populate `MEMORY.md` and generate a `knowledge/` directory from existing
+>   source code (rather than starting with empty templates), use the
+>   `codebase-to-sdd-knowledge` skill after setup.
 
 ## What Gets Created
 
@@ -68,7 +70,7 @@ as the source. **Replace placeholders** with project-specific values:
 
 ### Step 4: Create MEMORY.md
 
-Create `MEMORY.md` at project root. Start with an empty template — it grows organically
+Create `MEMORY.md` at project root. Start with the template — it grows organically
 as features ship. The template includes sections for:
 - API/tech gotchas (tagged for searchability)
 - Patterns that worked
@@ -76,6 +78,11 @@ as features ship. The template includes sections for:
 - Code ownership map
 - Common bugs fixed
 - AI workflow rule
+
+If the project already has existing code, consider running the
+`codebase-to-sdd-knowledge` skill after setup to populate `MEMORY.md` and
+generate a `knowledge/` directory from analysis of the actual codebase,
+git history, and structure — rather than starting from an empty template.
 
 ### Step 5: Update AGENTS.md / CLAUDE.md
 
@@ -110,6 +117,9 @@ After setup, summarize what was created and how to use it:
 - How to start a new feature (just describe it)
 - Where feature specs live (`specs/NNN-feature-name/`)
 - How MEMORY.md evolves (takeaways → curate → promote)
+- That `codebase-to-sdd-knowledge` can populate MEMORY.md and generate a
+  `knowledge/` directory from existing code when setting up SDD on a project
+  that already has source code
 
 ## Template Customization
 

@@ -352,3 +352,15 @@ needs clarification. Don't resolve it by guessing.
 - `references/sdd-fields.md` — Maps each section of each knowledge file
   to the specific SDD template fields they feed. Read this when you need
   to understand how downstream agents will consume the knowledge.
+
+## Related skills
+
+- `codebase-to-sdd-knowledge` — The code-based companion to this skill.
+  Whereas this skill extracts structured knowledge from *markdown documents*
+  (PRDs, feature requests, meeting notes), `codebase-to-sdd-knowledge`
+  extracts structured knowledge directly from *source code*, git history,
+  and directory structure. They produce the same output format
+  (`knowledge/` + `MEMORY.md`) but from different inputs: one from prose,
+  one from code.
+- `sdd-feature-builder` — Consumes the `knowledge/` output from either
+  skill to build features via the SDD workflow.
