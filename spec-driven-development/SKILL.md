@@ -17,6 +17,11 @@ Sets up a complete spec-driven development workflow in any project. Creates the
 folder structure, templates, and AGENTS.md integration so AI tools follow a
 write-spec-before-code process for every feature.
 
+> **Related skill:** this skill only *sets up* the scaffolding. To actually build
+> a feature against an already-set-up workflow, use the `sdd-feature-builder`
+> skill, which assigns the next `NNN` spec folder, co-authors spec + plan, and
+> implements one commit per task through to takeaways and `MEMORY.md`.
+
 ## What Gets Created
 
 ```
