@@ -40,6 +40,10 @@ Read, in this order, and let them shape every later step:
    Traverse any relevant domain files before writing specs.
 4. `MEMORY.md` — search for `#tags` relevant to the feature (`#api`, `#ui`,
    `#build`, `#security`, …). Treat `⚡` entries as non-negotiable guardrails.
+   - If the project has `memory/meta.json`, also run
+     `scripts/memory-query.sh --topic <tag>` for each relevant tag. This
+     surfaces community summaries and related entries beyond what a plain
+     MEMORY.md scan provides.
 5. `specs/index.md` — existing features, statuses, and the `touches` column
    (file-conflict detection) plus `depends_on`.
 
@@ -100,7 +104,9 @@ For each task, run the loop in `references/implementation-loop.md`:
 implement → run build + test + lint → fix → commit (matching the repo's commit
 message style) → mark the task done. Keep **exactly one** task in progress at a
 time. Before writing code that touches a known-risky area, re-check the relevant
-`MEMORY.md` `#tag` so you don't repeat a logged bug.
+`MEMORY.md` `#tag` so you don't repeat a logged bug. If the project has
+`memory/meta.json`, also run `scripts/memory-status.sh` to check for stale or
+pending-review entries related to your current task.
 
 Respect the user's commit preference: only commit when the project's workflow
 expects per-task commits or the user has asked for it. If unsure, batch the work
@@ -115,6 +121,10 @@ Follow `references/ship-checklist.md`:
 2. Promote durable findings into `MEMORY.md` — tagged (`#api`/`#ui`/`#build`/
    `#security`), `⚡` for critical guardrails — and update the Code Ownership Map
    + Common Bugs Fixed.
+   - If the project has `memory/meta.json`, write entries using the enriched
+     YAML frontmatter format (see `self-evolving-memory/references/entry-format.md`).
+     Include `type`, `confidence`, `tags`, `source`, and `related` fields.
+   - After writing, run `scripts/memory-update.sh` to regenerate derived files.
 3. Update `specs/index.md`: set the feature's status (`✅ Done`) and `touches`;
    bump `last_updated`.
 4. Flip `plan.md` `status` to match.
@@ -132,6 +142,32 @@ Follow `references/ship-checklist.md`:
 - Never commit secrets. Honor the repo's existing commit-message convention.
 - Do not invent requirements — drive spec.md/plan.md through `doc-coauthoring`.
 
+## Migration to self-evolving memory
+
+If the project was built with an older version of this skill and has plain
+MEMORY.md entries (no YAML frontmatter, no `memory/` directory), migrate it
+to use the enriched entry format and knowledge graph:
+
+1. **Initialize memory** (if not already done): Run `scripts/memory-init.sh`.
+   This parses the plain MEMORY.md, assigns IDs, infers types and tags, and
+   scaffolds the `memory/` directory. See `spec-driven-development`'s migration
+   section for details.
+
+2. **Retrospectively promote existing takeaways**: Walk through each completed
+   feature's `specs/NNN-name/takeaways.md`. For each durable finding (gotchas,
+   patterns, decisions, bugs), promote it to MEMORY.md using the enriched YAML
+   frontmatter format with `source: feature-NNN` and `type` matching the content.
+   Skip feature-specific trivia — only promote project-wide, reusable knowledge.
+
+3. **Update**: After all promotions, run `scripts/memory-update.sh` to
+   regenerate `meta.json` and `graph.json`.
+
+4. **Report**: "Promoted M learnings from N completed features into enriched
+   memory entries. Run `scripts/memory-evolve.sh` to consolidate and connect."
+
+Existing MEMORY.md entries and specs/ structure are preserved. Features without
+`takeaways.md` are skipped gracefully.
+
 ## Collaborating skills
 
 - `doc-coauthoring` — spec.md + plan.md authoring (required).
@@ -145,6 +181,11 @@ Follow `references/ship-checklist.md`:
 - `markdown-to-sdd-knowledge` — converts feature documents (PRDs, meeting
   notes, Slack threads) into structured knowledge files. Run this before
   the spec-authoring phase if the feature originated from a document.
+- `self-evolving-memory` — evolves MEMORY.md over time: auto-distills
+  observations into entries, consolidates similar knowledge, connects related
+  entries via a graph, and surfaces stale entries for review. Query with
+  `scripts/memory-query.sh --topic <tag>` for richer context including
+  community summaries and related entries beyond plain MEMORY.md scans.
 
 ## References
 

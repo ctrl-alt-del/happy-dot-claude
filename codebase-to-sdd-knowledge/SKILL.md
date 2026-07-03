@@ -50,6 +50,22 @@ Analyze a code repository and produce two artifacts:
   `markdown-to-sdd-knowledge` instead
 - The user wants to build a feature — use `sdd-feature-builder` instead
 
+## Memory integration
+
+Before beginning code analysis:
+- If the project has `memory/meta.json`, run `scripts/memory-query.sh --topic <tag>`
+  for each domain being analyzed (e.g., `api`, `auth`, `database`, `security`).
+  This surfaces existing knowledge to avoid re-discovering known issues.
+
+When populating MEMORY.md:
+- If the project has `memory/meta.json`, write entries using the enriched YAML
+  frontmatter format from `self-evolving-memory/references/entry-format.md`.
+  Use `type: gotcha|pattern|decision|fact`, set `source: codebase-analysis-YYYY-MM-DD`,
+  and infer `tags` from the domain.
+- After populating, run `scripts/memory-update.sh` to regenerate derived files.
+
+If `memory/meta.json` does not exist, fall back to the plain MEMORY.md format.
+
 ## Quick start
 
 ```
@@ -61,6 +77,7 @@ Analyze a code repository and produce two artifacts:
    → annotated directory tree with symbol extraction
 4. Read references/languages/<detected>.md for what to look for
 5. Follow references/workflow.md for the full 5-phase process
+6. (If `memory/meta.json` exists) Run `scripts/memory-update.sh` after populating MEMORY.md
 ```
 
 ## How this skill works
@@ -193,6 +210,12 @@ When writing to `MEMORY.md` (create or update at project root):
 Each entry in gotchas and patterns should be tagged for searchability
 (`#api`, `#ui`, `#build`, `#security`, `#data`, `#infra`).
 
+If the project has a self-evolving memory (`memory/meta.json`), prefer writing
+entries with enriched YAML frontmatter (see
+`self-evolving-memory/references/entry-format.md`) and run
+`scripts/memory-update.sh` after populating. Plain entries are still valid
+and will be enriched on the next evolution cycle.
+
 ## Language-specific strategies
 
 Detect the primary language (Phase 1), then read the relevant file:
@@ -260,3 +283,57 @@ python scripts/detect_language.py /path/to/project
   in `gaps.md` under a "Skipped files" section.
 - **No git history** (shallow clone, new repo): Skip git analysis. Note in
   `gaps.md` under "Missing data" section.
+
+## Self-evolving memory integration
+
+When `memory/meta.json` exists in the project (from the `self-evolving-memory`
+skill), the MEMORY.md output step should use enriched entry format with YAML
+frontmatter. See `self-evolving-memory/references/entry-format.md` for the
+complete spec.
+
+Key fields to populate:
+- `type`: `gotcha` for sharp edges, `pattern` for conventions, `decision` for
+  inferred ADRs, `fact` for ownership/constraints
+- `confidence`: 0.7 for code-inferred, 0.9 for git-history-backed, 1.0 for
+  explicitly documented
+- `tags`: domain tags matching the knowledge file tags
+- `source`: `codebase-analysis-YYYY-MM-DD`
+
+After populating, run `scripts/memory-update.sh` to regenerate `meta.json` and
+`graph.json` from the updated MEMORY.md.
+
+### Migrating an existing project
+
+If the project already has a `knowledge/` directory (from a previous analysis)
+but no `memory/` directory, link the existing knowledge into the memory graph:
+
+1. **Initialize memory**: Run `scripts/memory-init.sh` to scaffold `memory/`
+   from the existing MEMORY.md. This parses plain entries and assigns IDs.
+
+2. **Map knowledge files to memory entries**: For each significant knowledge
+   file (gotchas, patterns, architecture decisions), create a corresponding
+   enriched MEMORY.md entry with `source: knowledge/<path>` and `type` matching
+   the file's domain:
+   - `knowledge/edges/gotchas/*.md` → `type: gotcha`
+   - `knowledge/patterns/*.md` → `type: pattern`
+   - `knowledge/architecture/decisions/*.md` → `type: decision`
+   - `knowledge/data/entities.md` → `type: fact`
+
+3. **Seed cross-references**: Use wiki-style links from knowledge files to
+   populate the `related` field in entry frontmatter. For example,
+   `[[knowledge/edges/gotchas#auth-pitfalls]]` in a patterns file should create
+   a `related` link between the pattern entry and the gotcha entry.
+
+4. **Run the analysis again** (optional): Re-run the full codebase analysis.
+   Since `memory/meta.json` now exists, Phase 1 (orientation) loads existing
+   entries instead of starting fresh, and Phase 4.4 writes enriched entries.
+
+5. **Update and verify**: Run `scripts/memory-update.sh` then
+   `scripts/memory-status.sh`. Confirm knowledge files and memory entries are
+   consistent.
+
+6. **Report**: "Linked N knowledge files into memory graph with M
+   cross-references. Run `scripts/memory-graph.sh` to visualize."
+
+The `knowledge/` directory is not modified — it remains the detailed reference.
+The memory graph provides a higher-level, evolving view of the same knowledge.

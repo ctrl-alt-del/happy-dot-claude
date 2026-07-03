@@ -24,6 +24,45 @@ write-spec-before-code process for every feature.
 >   source code (rather than starting with empty templates), use the
 >   `codebase-to-sdd-knowledge` skill after setup.
 
+## Memory integration
+
+If the project already has `memory/meta.json` (from the `self-evolving-memory`
+skill), skip the plain MEMORY.md step below. Instead, after scaffolding the
+project, run `scripts/memory-init.sh` to initialize the self-evolving memory.
+This creates the `memory/` directory alongside MEMORY.md and enables automatic
+knowledge evolution (distillation, consolidation, connection, forgetting).
+
+When writing to MEMORY.md, use the enriched YAML frontmatter entry format from
+`self-evolving-memory/references/entry-format.md`. Include `type`, `confidence`,
+`tags`, and `source` fields.
+
+If `memory/meta.json` does not exist, use the plain MEMORY.md template below.
+
+## Migration to self-evolving memory
+
+If the project was set up with an older version of this skill and has a plain
+MEMORY.md (no YAML frontmatter on entries, no `memory/` directory), migrate it
+to the self-evolving memory system:
+
+1. **Detect**: MEMORY.md exists AND `memory/meta.json` does NOT exist.
+2. **Run**: `scripts/memory-init.sh` — this parses the plain MEMORY.md, assigns
+   `mem-XXX` IDs to each entry, infers `type` from section headers
+   (`## 🧠 Tech Gotchas` → `gotcha`, `## 🔧 Patterns That Worked` → `pattern`,
+   `## 📐 Architecture Decisions` → `decision`, `## 📂 Code Ownership Map` →
+   `fact`, `## 🐛 Common Bugs Fixed` → `gotcha`), extracts tags from `#tag`
+   mentions in entry bodies, and creates the `memory/` directory structure.
+   The original MEMORY.md is backed up to `memory/.backup/pre-migration/`.
+3. **Verify**: Run `scripts/memory-status.sh` — confirm all entries were parsed
+   and counts match expectations.
+4. **Evolve** (optional): Run `scripts/memory-evolve.sh` to consolidate similar
+   entries, build the relationship graph, and compute initial confidence scores.
+5. **Report**: "Migrated N entries to self-evolving memory. Run
+   `scripts/memory-graph.sh` to visualize the knowledge graph."
+
+All existing MEMORY.md content is preserved. Plain entries without frontmatter
+are treated as confirmed/permanent with default metadata and will be enriched
+with YAML frontmatter on the next evolution cycle.
+
 ## What Gets Created
 
 ```
@@ -120,6 +159,9 @@ After setup, summarize what was created and how to use it:
 - That `codebase-to-sdd-knowledge` can populate MEMORY.md and generate a
   `knowledge/` directory from existing code when setting up SDD on a project
   that already has source code
+- That `self-evolving-memory` can initialize a self-evolving memory layer on
+  top of MEMORY.md — enabling auto-distillation, consolidation, and usage-based
+  forgetting over time
 
 ## Template Customization
 
@@ -134,6 +176,7 @@ project's conventions:
 
 - `specs/` is separate from permanent `docs/` — don't merge them
 - `MEMORY.md` is project-wide, not per-feature
+- YAML frontmatter in MEMORY.md entries (from `self-evolving-memory`) must be preserved — do not strip it
 - Feature IDs are zero-padded sequential (001, 002, ...)
 - One task = one commit (build + test must pass per task)
 - `index.md` tracks file conflicts via the `touches` column
@@ -149,3 +192,4 @@ project's conventions:
 - `assets/templates/test_plan.md` — Test plan template
 - `assets/templates/takeaways.md` — Feature takeaways template
 - `assets/templates/index.md` — Feature index template
+- `self-evolving-memory/references/entry-format.md` — Enriched MEMORY.md entry format (use when `memory/meta.json` exists)
