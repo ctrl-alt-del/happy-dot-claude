@@ -1,0 +1,22 @@
+{
+  "collected_at": "2026-07-03T10:00:00Z",
+  "collector": "error",
+  "source": "build-failure-001",
+  "observations": [
+    {
+      "text": "Test testUserAuth fails because validateToken(null) throws NullPointerException in src/auth/token.ts:42.",
+      "tags": ["api", "auth"],
+      "confidence": 0.5
+    },
+    {
+      "text": "Calling validateToken with null argument crashes the auth middleware; same root cause as the production outage last week in middleware/auth.ts:87.",
+      "tags": ["api", "auth", "security"],
+      "confidence": 0.5
+    },
+    {
+      "text": "The rate limiter at src/api/rate-limiter.ts:120 uses sliding window but the docs say fixed window, causing confusion about burst limits.",
+      "tags": ["api", "docs"],
+      "confidence": 0.5
+    }
+  ]
+}

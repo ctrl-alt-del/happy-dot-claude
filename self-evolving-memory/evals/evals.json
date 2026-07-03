@@ -1,0 +1,87 @@
+{
+  "skill_name": "self-evolving-memory",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Initialize self-evolving memory on a project that has an existing plain MEMORY.md file with gotcha and pattern entries but no memory/ directory.",
+      "expected_output": "The memory-init.sh script detects the plain MEMORY.md, backs it up, creates memory/ directory structure, writes meta.json and graph.json with correct schema version, and reports the number of entries parsed.",
+      "files": ["evals/files/plain-memory.md"],
+      "expectations": [
+        "memory/meta.json exists with version 1.0.0",
+        "memory/graph.json exists with version 1.0.0",
+        "memory/raw/ directory exists",
+        "memory/.backup/ directory exists",
+        "MEMORY.md is backed up to .backup/",
+        ".gitignore includes memory/raw/ and memory/.backup/",
+        "At least 4 entries are detected in the plain MEMORY.md"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Run memory status on a project with initialized memory that has 3 active gotcha entries, 2 deprecated entries, and 5 raw observations.",
+      "expected_output": "memory-status.sh reports correct counts: 5 total entries (3 active, 2 deprecated), 5 raw observations, lists deprecated and pinned counts, shows PII scan summary.",
+      "files": ["evals/files/meta-sample.json", "evals/files/graph-sample.json"],
+      "expectations": [
+        "Reports total entries = 5",
+        "Reports active entries = 3",
+        "Reports deprecated entries = 2",
+        "Reports raw observation count",
+        "PII scan section is present",
+        "Exit code 0"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Distill 3 raw observations about null pointer errors into candidate memory entries. Two observations describe the same issue, one is about a different issue.",
+      "expected_output": "The distill phase produces 2 candidate entries (not 3), the recurring observation gets recurrence_count: 2, entries have type gotcha, confidence: 0.5, and tags like [api, security].",
+      "files": ["evals/files/raw-observations.json"],
+      "expectations": [
+        "Produces 2 candidate entries, not 3",
+        "Recurring observation is merged with recurrence_count: 2",
+        "All entries have type: gotcha",
+        "All entries have confidence: 0.5",
+        "Entries include relevant tags from observations",
+        "No duplicate entries for the same underlying issue"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Consolidate two memory entries that describe the same pattern with different wording: one about 'connection pooling for database' and another about 'use shared DB connections'.",
+      "expected_output": "The consolidate phase detects similarity (high tag overlap, similar subject), merges them into one entry with combined information, supersedes the originals, and sets confidence to max of the two.",
+      "files": ["evals/files/duplicate-entries.json"],
+      "expectations": [
+        "Two similar entries are detected as merge candidates",
+        "Merged entry preserves non-redundant information from both",
+        "Original entries are marked superseded_by with the new entry ID",
+        "New entry confidence is max(original_confidences)",
+        "Tags are combined without duplicates"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Apply the decay function to a set of memory entries: one frequently accessed gotcha (20 times, 2 days), one rarely accessed fact (2 times, 90 days), one pinned gotcha (1 time, 150 days), and one new entry (0 times, 1 day).",
+      "expected_output": "The frequently accessed gotcha stays. The rarely accessed fact is flagged for review. The pinned gotcha stays despite low usage. The new entry stays (grace period).",
+      "files": ["evals/files/decay-input.json"],
+      "expectations": [
+        "Frequently accessed entry (access_count: 20, 2 days) stays active",
+        "Rarely accessed entry (access_count: 2, 90 days) is flagged for review or deprecated",
+        "Pinned entry (access_count: 1, 150 days) stays active despite decay score",
+        "New entry (0 accesses, 1 day) stays active (grace period)",
+        "Deprecation respects the ⚡ marker override"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Apply PII redaction to a session transcript containing: user email john@example.com, IP 192.168.1.42, a JWT token, and file path /home/alice/project/src/main.ts.",
+      "expected_output": "All PII is replaced with typed markers: [EMAIL] for email, [IP] for IP address, [TOKEN] for JWT, [PATH] for file path with username.",
+      "files": ["evals/files/pii-input.txt"],
+      "expectations": [
+        "john@example.com is replaced with [EMAIL]",
+        "192.168.1.42 is replaced with [IP]",
+        "JWT token is replaced with [TOKEN]",
+        "/home/alice/project/src/main.ts has username replaced: [PATH]/project/src/main.ts",
+        "Non-PII text is unchanged"
+      ]
+    }
+  ]
+}

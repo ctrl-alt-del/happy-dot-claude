@@ -14,6 +14,7 @@ description matches the task at hand.
 | [`gitignore-hardening`](gitignore-hardening/SKILL.md) | Audits and hardens `.gitignore` to prevent leaking secrets and sensitive info (keystores, .env files, API keys, credentials), and stops tracking files that were already committed. | — |
 | [`markdown-to-sdd-knowledge`](markdown-to-sdd-knowledge/SKILL.md) | Converts unstructured markdown (PRDs, feature requests, meeting notes, Slack threads) into structured, atomic knowledge files for Spec-Driven Development workflows. | ✅ |
 | [`sdd-feature-builder`](sdd-feature-builder/SKILL.md) | Implements a feature end-to-end via a project's existing spec-driven development workflow: next `NNN` spec folder, co-authored spec + plan, test plan + tasks, one-commit-per-task with build/test/lint, then takeaways → `MEMORY.md` and `specs/index.md` updates. | — |
+| [`self-evolving-memory`](self-evolving-memory/SKILL.md) | Creates and manages a self-improving project memory that auto-distills knowledge from agent sessions, git history, and error logs. Features GraphRAG-style entity relationships, community detection, consolidation of similar entries, usage-based forgetting with decay, PII protection, migration/rollback safety, and a D3.js graph visualization dashboard. | ✅ |
 | [`spec-driven-development`](spec-driven-development/SKILL.md) | Sets up a spec-driven development workflow in any project with `specs/` folder structure, `MEMORY.md`, and `AGENTS.md` integration so AI tools follow a write-spec-before-code workflow. | — |
 
 ## How it works

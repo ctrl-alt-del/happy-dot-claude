@@ -1,0 +1,21 @@
+{
+  "version": "1.0.0",
+  "entries": [
+    {
+      "id": "mem-010",
+      "type": "pattern",
+      "title": "Use connection pooling for all database access",
+      "confidence": 0.7,
+      "tags": ["database", "architecture", "performance"],
+      "body": "All services should use the shared connection pool via db.getPool(). This prevents connection exhaustion under load. The pool is configured in src/db/pool.ts with max 20 connections."
+    },
+    {
+      "id": "mem-011",
+      "type": "pattern",
+      "title": "Always use shared DB connections instead of per-request connections",
+      "confidence": 0.6,
+      "tags": ["database", "api"],
+      "body": "Individual database connections caused the connection limit to be hit during load testing. Services must import the shared connection from db.getPool() rather than creating new connections."
+    }
+  ]
+}

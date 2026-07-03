@@ -1,0 +1,53 @@
+{
+  "version": "1.0.0",
+  "entries": [
+    {
+      "id": "mem-020",
+      "type": "gotcha",
+      "title": "Frequently accessed entry",
+      "confidence": 0.9,
+      "access_count": 20,
+      "last_accessed": "2026-07-01T00:00:00Z",
+      "created": "2026-06-01T00:00:00Z",
+      "deprecated": false,
+      "pinned": false,
+      "tags": ["api"]
+    },
+    {
+      "id": "mem-021",
+      "type": "fact",
+      "title": "Rarely accessed fact",
+      "confidence": 0.6,
+      "access_count": 2,
+      "last_accessed": "2026-04-01T00:00:00Z",
+      "created": "2026-01-01T00:00:00Z",
+      "deprecated": false,
+      "pinned": false,
+      "tags": ["docs"]
+    },
+    {
+      "id": "mem-022",
+      "type": "gotcha",
+      "title": "Pinned production-critical gotcha",
+      "confidence": 1.0,
+      "access_count": 1,
+      "last_accessed": "2026-02-01T00:00:00Z",
+      "created": "2025-12-01T00:00:00Z",
+      "deprecated": false,
+      "pinned": true,
+      "tags": ["security"]
+    },
+    {
+      "id": "mem-023",
+      "type": "pattern",
+      "title": "Brand new entry",
+      "confidence": 0.5,
+      "access_count": 0,
+      "last_accessed": "2026-07-02T00:00:00Z",
+      "created": "2026-07-02T00:00:00Z",
+      "deprecated": false,
+      "pinned": false,
+      "tags": ["testing"]
+    }
+  ]
+}

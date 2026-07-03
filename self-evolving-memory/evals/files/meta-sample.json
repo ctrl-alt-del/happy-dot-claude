@@ -1,0 +1,83 @@
+{
+  "version": "1.0.0",
+  "created_at": "2026-07-01T00:00:00Z",
+  "updated_at": "2026-07-03T00:00:00Z",
+  "entries": [
+    {
+      "id": "mem-001",
+      "type": "gotcha",
+      "title": "Never call validateToken() with null",
+      "confidence": 1.0,
+      "created": "2026-06-15T00:00:00Z",
+      "last_accessed": "2026-07-02T00:00:00Z",
+      "access_count": 23,
+      "tags": ["api", "auth", "security"],
+      "source": "session-fix-auth-null",
+      "related": ["mem-002", "mem-005"],
+      "deprecated": false,
+      "pinned": true,
+      "recurrence_count": 4
+    },
+    {
+      "id": "mem-002",
+      "type": "pattern",
+      "title": "Use AuthGuard wrapper for all protected routes",
+      "confidence": 0.85,
+      "created": "2026-06-20T00:00:00Z",
+      "last_accessed": "2026-06-28T00:00:00Z",
+      "access_count": 12,
+      "tags": ["api", "auth"],
+      "source": "session-auth-guard",
+      "related": ["mem-001"],
+      "deprecated": false,
+      "pinned": false,
+      "recurrence_count": 3
+    },
+    {
+      "id": "mem-003",
+      "type": "decision",
+      "title": "ADR: Use connection pooling for all database access",
+      "confidence": 1.0,
+      "created": "2026-06-01T00:00:00Z",
+      "last_accessed": "2026-07-01T00:00:00Z",
+      "access_count": 8,
+      "tags": ["architecture", "database"],
+      "source": "session-arch-review",
+      "related": [],
+      "deprecated": false,
+      "pinned": true,
+      "recurrence_count": 2
+    },
+    {
+      "id": "mem-004",
+      "type": "gotcha",
+      "title": "Old: direct DB connections (deprecated)",
+      "confidence": 0.3,
+      "created": "2026-05-15T00:00:00Z",
+      "last_accessed": "2026-05-20T00:00:00Z",
+      "access_count": 2,
+      "tags": ["database"],
+      "source": "session-old-pattern",
+      "related": [],
+      "superseded_by": "mem-003",
+      "deprecated": true,
+      "pinned": false,
+      "recurrence_count": 1
+    },
+    {
+      "id": "mem-005",
+      "type": "gotcha",
+      "title": "Deprecated: old rate limiter approach",
+      "confidence": 0.2,
+      "created": "2026-04-01T00:00:00Z",
+      "last_accessed": "2026-04-15T00:00:00Z",
+      "access_count": 1,
+      "tags": ["api"],
+      "source": "session-old-rate-limit",
+      "related": [],
+      "deprecated": true,
+      "pinned": false,
+      "recurrence_count": 1
+    }
+  ]
+}

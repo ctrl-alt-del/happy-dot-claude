@@ -1,0 +1,19 @@
+{
+  "version": "1.0.0",
+  "nodes": [
+    {"id": "mem-001", "title": "Never call validateToken() with null", "type": "gotcha", "confidence": 1.0, "tags": ["api", "auth", "security"], "community": 1, "pinned": true},
+    {"id": "mem-002", "title": "Use AuthGuard wrapper for all protected routes", "type": "pattern", "confidence": 0.85, "tags": ["api", "auth"], "community": 1, "pinned": false},
+    {"id": "mem-003", "title": "ADR: Use connection pooling", "type": "decision", "confidence": 1.0, "tags": ["architecture", "database"], "community": 2, "pinned": true},
+    {"id": "mem-004", "title": "Old: direct DB connections", "type": "gotcha", "confidence": 0.3, "tags": ["database"], "community": 2, "pinned": false},
+    {"id": "mem-005", "title": "Deprecated: old rate limiter", "type": "gotcha", "confidence": 0.2, "tags": ["api"], "community": 1, "pinned": false}
+  ],
+  "edges": [
+    {"source": "mem-001", "target": "mem-002", "relation": "causes"},
+    {"source": "mem-002", "target": "mem-001", "relation": "caused_by"},
+    {"source": "mem-003", "target": "mem-004", "relation": "supersedes"}
+  ],
+  "communities": {
+    "1": "Authentication and API security patterns",
+    "2": "Database architecture and connection management"
+  }
+}
