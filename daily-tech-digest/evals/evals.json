@@ -42,7 +42,22 @@
         "Highlights items are genuinely significant (model releases, major product launches, scandals, $1B+ deals)",
         "Total items is at most 25",
         "No fabricated items — sparse sources result in fewer items, not invented ones",
-        "All links verified (link_verified: true for every item)"
+      "All links verified (link_verified: true for every item)"
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "prompt": "Give me a weekly digest of AI and tech news for the week of July 4, 2026 — fetch from all sources and generate the interactive HTML page. Capped at 45 items, Mon-Sun week. Use existing daily data for any days already fetched.",
+      "expected_output": "An HTML file saved to ~/Desktop/news-digest/2026-06-29-W27-week.html (Monday of the week containing July 4, 2026) with at most 45 items covering the full Mon-Sun week. Deduplicated across all 7 days.",
+      "files": [],
+      "expectations": [
+        "Weekly digest covers Mon-Sun calendar week containing 2026-07-04",
+        "Cap at most 45 items",
+        "Filename format is YYYY-MM-DD-WNN-week.html with Monday date and ISO week number",
+        "No duplicate items across days (URL dedup across all 7 days)",
+        "All items have bilingual titles and domain-tagged keywords",
+        "Existing daily raw.json files are reused where available (cache reuse)"
       ]
     }
   ]

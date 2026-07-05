@@ -10,6 +10,9 @@ Usage:
     python3 fetch_digest.py --verify-links            # verify all URLs
     python3 fetch_digest.py --output-dir ~/custom     # custom output dir
     python3 fetch_digest.py --hours 48                # look back 48h instead of 24h
+    python3 fetch_digest.py --date 2026-07-04         # target a specific date
+    python3 fetch_digest.py --date 2026-07-04 --week  # Mon-Sun week containing date
+    python3 fetch_digest.py --week --save-raw         # this week, save to disk
 """
 
 import argparse
@@ -159,9 +162,17 @@ RSS_FEEDS = [
 ]
 
 
-def fetch_rss_feeds(feeds, hours=24):
+def fetch_rss_feeds(feeds, hours=24, target_date=None):
     items = []
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    if target_date:
+        date_dt = datetime.strptime(target_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        day_start = date_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = date_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+        cutoff = day_start
+        upper = day_end + timedelta(days=1)  # allow next day too for timezone fuzz
+    else:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+        upper = None
 
     for cfg in feeds:
         try:
@@ -174,8 +185,12 @@ def fetch_rss_feeds(feeds, hours=24):
             feed = feedparser.parse(resp.content)
             for entry in feed.entries:
                 pub_date = _parse_entry_date(entry)
-                if pub_date and pub_date < cutoff:
-                    continue
+                if target_date:
+                    if pub_date and (pub_date < cutoff or pub_date > upper):
+                        continue
+                else:
+                    if pub_date and pub_date < cutoff:
+                        continue
 
                 content = ""
                 if hasattr(entry, "summary"):
@@ -222,7 +237,13 @@ def _clean_text(text):
 
 # ── GitHub Trending scraper ─────────────────────────────────────────────────
 
-def fetch_github_trending():
+def fetch_github_trending(target_date=None):
+    if target_date and target_date != datetime.now(timezone.utc).strftime("%Y-%m-%d"):
+        return _fetch_github_search(target_date)
+    return _fetch_github_trending_today()
+
+
+def _fetch_github_trending_today():
     items = []
     try:
         resp = requests.get(
@@ -269,9 +290,52 @@ def fetch_github_trending():
     return items
 
 
+def _fetch_github_search(target_date):
+    """Fallback for historical dates — use GitHub Search API for repos
+    created or updated on the target date."""
+    items = []
+    try:
+        date_obj = datetime.strptime(target_date, "%Y-%m-%d")
+        date_str = date_obj.strftime("%Y-%m-%d")
+        resp = requests.get(
+            "https://api.github.com/search/repositories",
+            params={
+                "q": f"created:{date_str}..{date_str} stars:>=10",
+                "sort": "stars",
+                "order": "desc",
+                "per_page": 15,
+            },
+            headers={
+                "User-Agent": "daily-tech-digest/1.0",
+                "Accept": "application/vnd.github.v3+json",
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        for repo in data.get("items", []):
+            lang = repo.get("language") or ""
+            desc = repo.get("description") or ""
+            detail = desc
+            if lang:
+                detail = f"{desc}  [Lang: {lang}]" if desc else f"[Lang: {lang}]"
+            items.append(NewsItem(
+                title=repo.get("full_name", ""),
+                url=repo.get("html_url", ""),
+                source="GitHub Trending",
+                date=date_obj.replace(tzinfo=timezone.utc).isoformat(),
+                language="en",
+                section="github_trending",
+                raw_content=detail,
+            ))
+    except Exception as exc:
+        print(f"  [warn] GitHub Search ({target_date}): {exc}", file=sys.stderr)
+    return items
+
+
 # ── HuggingFace API ─────────────────────────────────────────────────────────
 
-def fetch_huggingface_trending():
+def fetch_huggingface_trending(target_date=None):
     items = []
     try:
         resp = requests.get(
@@ -291,6 +355,8 @@ def fetch_huggingface_trending():
             downloads = model.get("downloads", 0)
             likes = model.get("likes", 0)
             last_modified = model.get("lastModified", datetime.now(timezone.utc).isoformat())
+            if target_date:
+                last_modified = datetime.strptime(target_date, "%Y-%m-%d").replace(tzinfo=timezone.utc).isoformat()
 
             parts = [f"Downloads: {downloads}", f"Likes: {likes}"]
             if tags:
@@ -356,7 +422,7 @@ ARXIV_AFFILIATIONS = {
 }
 
 
-def fetch_arxiv(categories, affiliations, max_per_cat=15):
+def fetch_arxiv(categories, affiliations, max_per_cat=15, target_date=None):
     items = []
     base_url = "http://export.arxiv.org/api/query"
 
@@ -426,10 +492,29 @@ def deduplicate(items):
     return unique
 
 
+# ── Cache loading for weekly mode ────────────────────────────────────────────
+
+def _load_cached_items(date_str, output_dir):
+    """Load items from an existing YYYY-MM-DD-raw.json if it exists."""
+    path = os.path.join(output_dir, f"{date_str}-raw.json")
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path) as f:
+            data = json.load(f)
+        items = [NewsItem(**item) for item in data.get("items", [])]
+        print(f"  [cache] {date_str}: loaded {len(items)} existing items",
+              file=sys.stderr)
+        return items
+    except Exception as exc:
+        print(f"  [warn] {date_str}: cache load failed: {exc}",
+              file=sys.stderr)
+        return None
+
+
 # ── Main ────────────────────────────────────────────────────────────────────
 
 def main():
-    # Global safety net: no single socket operation may block past the cap.
     socket.setdefaulttimeout(MAX_FETCH_TIMEOUT)
 
     parser = argparse.ArgumentParser(
@@ -442,7 +527,7 @@ def main():
     )
     parser.add_argument(
         "--hours", type=int, default=24,
-        help="Hours to look back for RSS items (default: 24)",
+        help="Hours to look back for RSS items (default: 24; ignored when --date is used)",
     )
     parser.add_argument(
         "--save-raw", action="store_true",
@@ -456,33 +541,101 @@ def main():
         "--skip-focus", action="store_true",
         help="Skip focus topic detection",
     )
+    parser.add_argument(
+        "--date",
+        help="Target date as YYYY-MM-DD (default: today)",
+    )
+    parser.add_argument(
+        "--week", action="store_true",
+        help="Fetch for the Mon-Sun calendar week containing --date. "
+             "Reuses existing YYYY-MM-DD-raw.json files for days already fetched.",
+    )
     args = parser.parse_args()
+
+    if args.date:
+        try:
+            datetime.strptime(args.date, "%Y-%m-%d")
+        except ValueError:
+            parser.error("--date must be in YYYY-MM-DD format")
+        print(f"Target date: {args.date}", file=sys.stderr)
+    else:
+        args.date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        print(f"Target date: {args.date} (today)", file=sys.stderr)
 
     all_items = []
 
-    # RSS
-    print("Fetching RSS feeds ...", file=sys.stderr)
-    rss_items = fetch_rss_feeds(RSS_FEEDS, args.hours)
-    print(f"  {len(rss_items)} items", file=sys.stderr)
-    all_items.extend(rss_items)
+    if args.week:
+        target_dt = datetime.strptime(args.date, "%Y-%m-%d")
+        monday = target_dt - timedelta(days=target_dt.weekday())
+        iso_week = monday.isocalendar().week
+        sunday = monday + timedelta(days=6)
 
-    # GitHub Trending
-    print("Fetching GitHub Trending ...", file=sys.stderr)
-    gh_items = fetch_github_trending()
-    print(f"  {len(gh_items)} items", file=sys.stderr)
-    all_items.extend(gh_items)
+        print(f"Weekly mode: Mon {monday.strftime('%Y-%m-%d')} to "
+              f"Sun {sunday.strftime('%Y-%m-%d')} (W{iso_week})",
+              file=sys.stderr)
 
-    # HuggingFace
-    print("Fetching HuggingFace trending ...", file=sys.stderr)
-    hf_items = fetch_huggingface_trending()
-    print(f"  {len(hf_items)} items", file=sys.stderr)
-    all_items.extend(hf_items)
+        cached_days = 0
+        fetched_days = 0
+        for offset in range(7):
+            day_date = (monday + timedelta(days=offset)).strftime("%Y-%m-%d")
+            print(f"\n--- {day_date} ---", file=sys.stderr)
 
-    # arXiv
-    print("Fetching arXiv papers ...", file=sys.stderr)
-    arxiv_items = fetch_arxiv(ARXIV_CATEGORIES, ARXIV_AFFILIATIONS)
-    print(f"  {len(arxiv_items)} items", file=sys.stderr)
-    all_items.extend(arxiv_items)
+            cached = _load_cached_items(day_date, args.output_dir)
+            if cached is not None:
+                all_items.extend(cached)
+                cached_days += 1
+                continue
+
+            fetched_days += 1
+            rss_items = fetch_rss_feeds(RSS_FEEDS, args.hours, day_date)
+            print(f"  RSS: {len(rss_items)} items", file=sys.stderr)
+            all_items.extend(rss_items)
+
+            gh_items = fetch_github_trending(day_date)
+            print(f"  GitHub: {len(gh_items)} items", file=sys.stderr)
+            all_items.extend(gh_items)
+
+            hf_items = fetch_huggingface_trending(day_date)
+            print(f"  HF: {len(hf_items)} items", file=sys.stderr)
+            all_items.extend(hf_items)
+
+            arxiv_items = fetch_arxiv(ARXIV_CATEGORIES, ARXIV_AFFILIATIONS,
+                                       target_date=day_date)
+            print(f"  arXiv: {len(arxiv_items)} items", file=sys.stderr)
+            all_items.extend(arxiv_items)
+
+        print(f"\nCached days: {cached_days}, "
+              f"fetched days: {fetched_days}",
+              file=sys.stderr)
+
+        result_date = monday.strftime("%Y-%m-%d")
+    else:
+        # RSS
+        print("Fetching RSS feeds ...", file=sys.stderr)
+        rss_items = fetch_rss_feeds(RSS_FEEDS, args.hours, args.date)
+        print(f"  {len(rss_items)} items", file=sys.stderr)
+        all_items.extend(rss_items)
+
+        # GitHub Trending
+        print("Fetching GitHub Trending ...", file=sys.stderr)
+        gh_items = fetch_github_trending(args.date)
+        print(f"  {len(gh_items)} items", file=sys.stderr)
+        all_items.extend(gh_items)
+
+        # HuggingFace
+        print("Fetching HuggingFace trending ...", file=sys.stderr)
+        hf_items = fetch_huggingface_trending(args.date)
+        print(f"  {len(hf_items)} items", file=sys.stderr)
+        all_items.extend(hf_items)
+
+        # arXiv
+        print("Fetching arXiv papers ...", file=sys.stderr)
+        arxiv_items = fetch_arxiv(ARXIV_CATEGORIES, ARXIV_AFFILIATIONS,
+                                  target_date=args.date)
+        print(f"  {len(arxiv_items)} items", file=sys.stderr)
+        all_items.extend(arxiv_items)
+
+        result_date = args.date
 
     # Deduplicate
     all_items = deduplicate(all_items)
@@ -507,7 +660,7 @@ def main():
         sections[item.section] = sections.get(item.section, 0) + 1
 
     result = {
-        "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "date": result_date,
         "items": [asdict(item) for item in all_items],
         "stats": {
             "total_items": len(all_items),
@@ -515,12 +668,17 @@ def main():
             **sections,
         },
     }
+    if args.week:
+        result["week_number"] = iso_week
 
     # Save raw if requested
     if args.save_raw:
         os.makedirs(args.output_dir, exist_ok=True)
-        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        raw_path = os.path.join(args.output_dir, f"{date_str}-raw.json")
+        if args.week:
+            raw_name = f"{result_date}-W{iso_week}-week-raw.json"
+        else:
+            raw_name = f"{args.date}-raw.json"
+        raw_path = os.path.join(args.output_dir, raw_name)
         with open(raw_path, "w") as f:
             json.dump(result, f, indent=2, ensure_ascii=False)
         print(f"Raw data saved → {raw_path}", file=sys.stderr)

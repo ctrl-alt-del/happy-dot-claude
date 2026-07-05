@@ -9,13 +9,16 @@ description: >
   what's going on in the AI/tech world — even if they don't explicitly say
   "digest" or "daily." Also trigger when the user asks about recent
   developments from specific companies (OpenAI, Google, DeepSeek, etc.) or
-  wants to catch up on the latest research papers.
+  wants to catch up on the latest research papers. Also trigger for 'weekly
+  roundup,' 'this week's news,' 'week in review,' 'weekly digest,' 'week of
+  <date>,' or any request spanning multiple days.
 ---
 
 # Daily AI & Tech Digest
 
-Produce a fact-only daily digest of AI and technology news as an interactive
-HTML page. The digest is saved to `~/Desktop/news-digest/YYYY-MM-DD.html`.
+Produce a fact-only daily or weekly digest of AI and technology news as an interactive
+HTML page. The digest is saved to `~/Desktop/news-digest/YYYY-MM-DD.html`
+(daily) or `~/Desktop/news-digest/YYYY-MM-DD-WNN-week.html` (weekly).
 
 ## Design principles
 
@@ -27,7 +30,8 @@ HTML page. The digest is saved to `~/Desktop/news-digest/YYYY-MM-DD.html`.
   bottom lists every origin.
 - **Language-respecting.** Chinese content stays in Chinese. All titles are
   bilingual (English / Chinese) so both audiences can scan.
-- **Capped and ranked.** Maximum 25 items total, prioritized by relevance to
+- **Capped and ranked.** Maximum 25 items (daily) or 45 items (weekly),
+  prioritized by relevance to
   focus industries (embodied AI, chip EDA, robotics, AI/ML, semiconductors).
 
 ## Workflow
@@ -68,7 +72,17 @@ python3 scripts/generate_html.py ~/Desktop/news-digest/YYYY-MM-DD-processed.json
 Then open the regenerated file(s) (e.g. `open ~/Desktop/news-digest/YYYY-MM-DD.html`)
 and you are done — do **not** fetch or re-process.
 
-**If the user chooses (B) Start fresh**, continue with Step 1 below.
+**If the user chooses (B) Start fresh**, also ask about scope before continuing:
+
+- **(1) Single-day digest** (25 items) — today only (or `--date` if specified).
+- **(2) Weekly digest** (45 items, Mon-Sun week) — pull all 7 days of the
+  calendar week containing the target date. Reuses cached daily raw data if
+  available.
+
+Default to (1) unless the user mentions "weekly," "this week," "past 7 days,"
+"roundup," or similar multi-day phrases — in which case default to (2).
+
+Then continue with Step 1 below.
 
 ### Step 1 — Ensure dependencies and run the fetcher
 
@@ -86,11 +100,21 @@ pip3 install -r scripts/requirements.txt
 
 If `pip3` is not available, try `pip` instead. Then run the fetcher:
 
+**Single-day:**
 ```bash
 python3 scripts/fetch_digest.py --verify-links --save-raw
+
+# ...or target a specific date:
+python3 scripts/fetch_digest.py --date 2026-07-04 --verify-links --save-raw
 ```
 
-This produces `~/Desktop/news-digest/YYYY-MM-DD-raw.json` and prints the
+**Weekly (Mon-Sun week containing the given date or today):**
+```bash
+python3 scripts/fetch_digest.py --date 2026-07-04 --week --save-raw
+```
+
+This produces `~/Desktop/news-digest/YYYY-MM-DD-raw.json` (daily) or
+`~/Desktop/news-digest/YYYY-MM-DD-WNN-week-raw.json` (weekly) and prints the
 JSON to stdout. The JSON contains an `items` array with fields: `title`,
 `url`, `source`, `date`, `language`, `section`, `raw_content`, `organization`,
 `arxiv_id`, `link_verified`, `focus_match`, `priority_hint`.
@@ -142,7 +166,7 @@ keywords (e.g. `大模型`, `具身智能`) for ZH items.
 
 **Rank** all items by: `priority_hint` (descending) > recency > content depth.
 
-**Cap** at 25 items total. Keep the highest-ranked 25.
+**Cap** at 25 items (single-day) or 45 items (weekly). Keep the highest-ranked.
 
 **Highlights**: From the top 25, select up to 10 items that qualify as
 exceptional significance (see criteria below). Set `is_highlight: true`.
@@ -261,10 +285,12 @@ Save this as `~/Desktop/news-digest/YYYY-MM-DD-processed.json`, then run:
 python3 scripts/generate_html.py ~/Desktop/news-digest/YYYY-MM-DD-processed.json
 ```
 
-This writes `~/Desktop/news-digest/YYYY-MM-DD.html` (the filename comes from
-the `date` field). The processed JSON is also embedded inside the HTML, so the
-page can be re-styled later even if the JSON is gone. Open the file in the
-user's default browser:
+This writes `~/Desktop/news-digest/YYYY-MM-DD.html` (daily) or
+`~/Desktop/news-digest/YYYY-MM-DD-WNN-week.html` (weekly). The filename comes
+from the `date` (and `week_number` for weekly) field. For weekly digests the
+date is Monday and NN is the ISO week number. The processed JSON is also
+embedded inside the HTML, so the page can be re-styled later even if the JSON
+is gone. Open the file in the user's default browser:
 
 ```bash
 open ~/Desktop/news-digest/YYYY-MM-DD.html
