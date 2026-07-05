@@ -46,6 +46,14 @@ Before doing anything else, **ask the user which mode they want**:
 - **(B) Start fresh** — pull the latest from all sources, process it, and
   generate a new HTML digest.
 
+**In addition, for fresh builds, ask whether the user wants:**
+- **(1) Single-day digest** — default, covers one date
+- **(2) Weekly digest** — covers the Mon-Sun calendar week containing the given date.
+  If the user mentions "this week", "weekly roundup", "past 7 days", or
+  "week of <date>", use weekly mode. Cap at 40 items. The fetcher reuses
+  existing `YYYY-MM-DD-raw.json` files for days already fetched, so running
+  daily digests followed by a weekly is fast and avoids redundant network calls.
+
 First check whether prior data exists:
 
 ```bash
@@ -78,8 +86,21 @@ The user may also specify a specific date to run against:
 python3 scripts/fetch_digest.py --verify-links --save-raw --date 2026-07-01
 ```
 
-When `--date` is given, the fetcher queries sources for that specific calendar
-day (instead of today). When omitted, it defaults to today.
+For a **weekly digest**, add `--week`:
+
+```bash
+python3 scripts/fetch_digest.py --verify-links --save-raw --date 2026-07-04 --week
+```
+
+When `--week` is used, the fetcher computes the Mon-Sun calendar week
+containing the given date. For each day in the week, it first checks whether
+`YYYY-MM-DD-raw.json` already exists in the output directory — if so, it loads
+those cached items instead of re-fetching. The raw output is saved as
+`YYYY-MM-DD-WNN-week-raw.json` (e.g. `2026-06-29-W27-week-raw.json`)
+where the date is the Monday of the week and NN is the ISO week number.
+
+When `--date` is given without `--week`, the fetcher queries sources for that
+specific calendar day (instead of today). When omitted, it defaults to today.
 
 ### Step 1 — Ensure dependencies and run the fetcher
 
@@ -156,7 +177,8 @@ keywords (e.g. `知识图谱`, `知识生命周期`) for ZH items.
 
 **Rank** all items by: `priority_hint` (descending) > recency > content depth.
 
-**Cap** at 25 items total. Keep the highest-ranked 25.
+**Cap** at 25 items for single-day digests, **40 items** for weekly digests.
+Keep the highest-ranked items.
 
 **Highlights**: From the top 25, select up to 10 items that qualify as
 exceptional significance (see criteria below). Set `is_highlight: true`.
@@ -200,9 +222,9 @@ agents, reasoning, prompting, and evaluation are in scope.
 
 ### Step 5 — Synthesize daily keywords
 
-Look across all 25 selected items and synthesize **8-12 daily keywords** —
-semantically meaningful themes that characterize the day's knowledge and
-agentic research, not just frequency counts. Each daily keyword has the same
+Look across all selected items and synthesize **8-12 daily keywords** —
+semantically meaningful themes that characterize the day's (or week's) knowledge
+and agentic research, not just frequency counts. Each daily keyword has the same
 `{"text": "...", "domain": "..."}` structure as item keywords. Use a mix of
 English and Chinese where appropriate.
 
@@ -277,17 +299,21 @@ Write the processed data as JSON conforming to this schema:
 }
 ```
 
-Save this as `~/Desktop/agentic-knowledge-digest/YYYY-MM-DD-processed.json`,
-then run:
+Save this as `~/Desktop/agentic-knowledge-digest/YYYY-MM-DD-processed.json`
+(for weekly: `YYYY-MM-DD-WNN-week-processed.json`, matching the raw file's
+date and week number), then run:
 
 ```bash
 python3 scripts/generate_html.py ~/Desktop/agentic-knowledge-digest/YYYY-MM-DD-processed.json
 ```
 
 This writes `~/Desktop/agentic-knowledge-digest/YYYY-MM-DD.html` (the filename
-comes from the `date` field). The processed JSON is also embedded inside the
-HTML, so the page can be re-styled later even if the JSON is gone. Open the
-file in the user's default browser:
+comes from the `date` field). For weekly digests, use the format
+`YYYY-MM-DD-WNN-week.html` where the date is the Monday of the week and NN is
+the ISO week number (e.g. `2026-06-29-W27-week.html`). The ISO week number is
+in the `week_number` field of the raw JSON. The processed JSON is also embedded
+inside the HTML, so the page can be re-styled later even if the JSON is gone.
+Open the file in the user's default browser:
 
 ```bash
 open ~/Desktop/agentic-knowledge-digest/YYYY-MM-DD.html

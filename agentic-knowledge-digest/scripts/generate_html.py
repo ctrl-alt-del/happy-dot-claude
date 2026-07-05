@@ -581,11 +581,15 @@ def load_data(path):
 
 def output_path_for(data, src_path, explicit=None):
     """Derive the output HTML path. Prefers data['date'] so the name is always
-    YYYY-MM-DD.html, regardless of the input filename."""
+    YYYY-MM-DD.html, regardless of the input filename. For weekly digests,
+    uses YYYY-MM-DD-WNN-week.html."""
     if explicit:
         return explicit
     directory = os.path.dirname(os.path.abspath(src_path))
     date = data.get("date")
+    week_number = data.get("week_number")
+    if date and week_number:
+        return os.path.join(directory, f"{date}-W{week_number}-week.html")
     if date:
         return os.path.join(directory, f"{date}.html")
     stem = os.path.basename(src_path).rsplit(".", 1)[0]

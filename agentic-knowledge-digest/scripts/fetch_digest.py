@@ -12,6 +12,7 @@ Usage:
     python3 fetch_digest.py --output-dir ~/custom        # custom output dir
     python3 fetch_digest.py --hours 48                   # look back 48h
     python3 fetch_digest.py --date 2026-07-01            # specific date
+    python3 fetch_digest.py --date 2026-07-04 --week     # Mon-Sun week
 """
 
 import argparse
@@ -858,6 +859,26 @@ def deduplicate(items):
     return unique
 
 
+# ── Cache loading for weekly mode ────────────────────────────────────────────
+
+def _load_cached_items(date_str, output_dir):
+    """Load items from an existing YYYY-MM-DD-raw.json if it exists."""
+    path = os.path.join(output_dir, f"{date_str}-raw.json")
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path) as f:
+            data = json.load(f)
+        items = [NewsItem(**item) for item in data.get("items", [])]
+        print(f"  [cache] {date_str}: loaded {len(items)} existing items",
+              file=sys.stderr)
+        return items
+    except Exception as exc:
+        print(f"  [warn] {date_str}: cache load failed: {exc}",
+              file=sys.stderr)
+        return None
+
+
 # ── Main ────────────────────────────────────────────────────────────────────
 
 def main():
@@ -894,6 +915,11 @@ def main():
         "--date",
         help="Target date as YYYY-MM-DD (default: today)",
     )
+    parser.add_argument(
+        "--week", action="store_true",
+        help="Fetch for the Mon-Sun calendar week containing --date. "
+             "Reuses existing YYYY-MM-DD-raw.json files for days already fetched.",
+    )
     args = parser.parse_args()
 
     if args.date:
@@ -908,37 +934,89 @@ def main():
 
     all_items = []
 
-    # RSS
-    print("Fetching RSS feeds ...", file=sys.stderr)
-    rss_items = fetch_rss_feeds(RSS_FEEDS, args.hours, args.date
-                                if args.date else None)
-    print(f"  {len(rss_items)} items", file=sys.stderr)
-    all_items.extend(rss_items)
+    if args.week:
+        target_dt = datetime.strptime(args.date, "%Y-%m-%d")
+        monday = target_dt - timedelta(days=target_dt.weekday())
+        iso_week = monday.isocalendar().week
+        sunday = monday + timedelta(days=6)
 
-    # Research & Community Blogs
-    print("Fetching research blogs ...", file=sys.stderr)
-    blog_items = fetch_blogs(BLOG_SCRAPERS, args.date)
-    print(f"  {len(blog_items)} items", file=sys.stderr)
-    all_items.extend(blog_items)
+        print(f"Weekly mode: Mon {monday.strftime('%Y-%m-%d')} to "
+              f"Sun {sunday.strftime('%Y-%m-%d')} (W{iso_week})",
+              file=sys.stderr)
 
-    # GitHub Trending
-    print("Fetching GitHub Trending ...", file=sys.stderr)
-    gh_items = fetch_github_trending(args.date)
-    print(f"  {len(gh_items)} items", file=sys.stderr)
-    all_items.extend(gh_items)
+        cached_days = 0
+        fetched_days = 0
+        for offset in range(7):
+            day_date = (monday + timedelta(days=offset)).strftime("%Y-%m-%d")
+            print(f"\n--- {day_date} ---", file=sys.stderr)
 
-    # HuggingFace
-    print("Fetching HuggingFace models ...", file=sys.stderr)
-    hf_items = fetch_huggingface_trending(args.date)
-    print(f"  {len(hf_items)} items", file=sys.stderr)
-    all_items.extend(hf_items)
+            cached = _load_cached_items(day_date, args.output_dir)
+            if cached is not None:
+                all_items.extend(cached)
+                cached_days += 1
+                continue
 
-    # arXiv
-    print("Fetching arXiv papers ...", file=sys.stderr)
-    arxiv_items = fetch_arxiv(ARXIV_CATEGORIES, ARXIV_AFFILIATIONS,
-                              target_date=args.date)
-    print(f"  {len(arxiv_items)} items", file=sys.stderr)
-    all_items.extend(arxiv_items)
+            fetched_days += 1
+            rss_items = fetch_rss_feeds(RSS_FEEDS, args.hours, day_date)
+            print(f"  RSS: {len(rss_items)} items", file=sys.stderr)
+            all_items.extend(rss_items)
+
+            blog_items = fetch_blogs(BLOG_SCRAPERS, day_date)
+            print(f"  Blogs: {len(blog_items)} items", file=sys.stderr)
+            all_items.extend(blog_items)
+
+            gh_items = fetch_github_trending(day_date)
+            print(f"  GitHub: {len(gh_items)} items", file=sys.stderr)
+            all_items.extend(gh_items)
+
+            hf_items = fetch_huggingface_trending(day_date)
+            print(f"  HF: {len(hf_items)} items", file=sys.stderr)
+            all_items.extend(hf_items)
+
+            arxiv_items = fetch_arxiv(ARXIV_CATEGORIES, ARXIV_AFFILIATIONS,
+                                       target_date=day_date)
+            print(f"  arXiv: {len(arxiv_items)} items", file=sys.stderr)
+            all_items.extend(arxiv_items)
+
+        print(f"\nCached days: {cached_days}, "
+              f"fetched days: {fetched_days}",
+              file=sys.stderr)
+
+        result_date = monday.strftime("%Y-%m-%d")
+    else:
+        # RSS
+        print("Fetching RSS feeds ...", file=sys.stderr)
+        rss_items = fetch_rss_feeds(RSS_FEEDS, args.hours, args.date
+                                    if args.date else None)
+        print(f"  {len(rss_items)} items", file=sys.stderr)
+        all_items.extend(rss_items)
+
+        # Research & Community Blogs
+        print("Fetching research blogs ...", file=sys.stderr)
+        blog_items = fetch_blogs(BLOG_SCRAPERS, args.date)
+        print(f"  {len(blog_items)} items", file=sys.stderr)
+        all_items.extend(blog_items)
+
+        # GitHub Trending
+        print("Fetching GitHub Trending ...", file=sys.stderr)
+        gh_items = fetch_github_trending(args.date)
+        print(f"  {len(gh_items)} items", file=sys.stderr)
+        all_items.extend(gh_items)
+
+        # HuggingFace
+        print("Fetching HuggingFace models ...", file=sys.stderr)
+        hf_items = fetch_huggingface_trending(args.date)
+        print(f"  {len(hf_items)} items", file=sys.stderr)
+        all_items.extend(hf_items)
+
+        # arXiv
+        print("Fetching arXiv papers ...", file=sys.stderr)
+        arxiv_items = fetch_arxiv(ARXIV_CATEGORIES, ARXIV_AFFILIATIONS,
+                                  target_date=args.date)
+        print(f"  {len(arxiv_items)} items", file=sys.stderr)
+        all_items.extend(arxiv_items)
+
+        result_date = args.date
 
     # Deduplicate
     all_items = deduplicate(all_items)
@@ -964,7 +1042,7 @@ def main():
         sections[item.section] = sections.get(item.section, 0) + 1
 
     result = {
-        "date": args.date,
+        "date": result_date,
         "items": [asdict(item) for item in all_items],
         "stats": {
             "total_items": len(all_items),
@@ -972,11 +1050,17 @@ def main():
             **sections,
         },
     }
+    if args.week:
+        result["week_number"] = iso_week
 
     # Save raw if requested
     if args.save_raw:
         os.makedirs(args.output_dir, exist_ok=True)
-        raw_path = os.path.join(args.output_dir, f"{args.date}-raw.json")
+        if args.week:
+            raw_name = f"{result_date}-W{iso_week}-week-raw.json"
+        else:
+            raw_name = f"{args.date}-raw.json"
+        raw_path = os.path.join(args.output_dir, raw_name)
         with open(raw_path, "w") as f:
             json.dump(result, f, indent=2, ensure_ascii=False)
         print(f"Raw data saved → {raw_path}", file=sys.stderr)
