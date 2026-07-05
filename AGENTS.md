@@ -111,6 +111,8 @@ example):
 - [ ] All referenced files and links resolve.
 - [ ] `evals/files/` fixtures exist for any eval that lists them.
 - [ ] README catalog table updated.
+- [ ] No `.venv/`, `__pycache__/`, or `node_modules/` directories committed
+      (rely on `.gitignore`).
 - [ ] No secrets, credentials, or malware; behavior matches the description
       (principle of least surprise).
 
@@ -121,3 +123,7 @@ example):
 - `codebase-to-sdd-knowledge/` demonstrates `scripts/` (deterministic helper
   tools), a multi-phase workflow, and language-specific reference files — a
   more advanced skill structure for complex analysis workflows.
+- `agentic-knowledge-digest/` demonstrates `scripts/` (Python fetcher + HTML
+  generator pipeline), multi-source aggregation (arXiv, blogs, GitHub, HF),
+  `--date` support for historical runs, and eval-driven development — a
+  complete data-pipeline skill.

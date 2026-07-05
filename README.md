@@ -9,6 +9,7 @@ description matches the task at hand.
 
 | Skill | What it does | Evals |
 |-------|--------------|-------|
+| [`agentic-knowledge-digest`](agentic-knowledge-digest/SKILL.md) | Fetches and summarizes AI/agentic knowledge research (RAG, knowledge graphs, knowledge lifecycle, agent memory, embeddings, multi-agent systems) into an interactive HTML digest. | ✅ |
 | [`codebase-to-sdd-knowledge`](codebase-to-sdd-knowledge/SKILL.md) | Analyzes a code repository (language detection, structural map, git history, deep analysis) to produce atomic, cross-referenced knowledge files organized by domain and populate `MEMORY.md` with durable findings — building a cognitive model of the codebase for downstream SDD agents. | — |
 | [`daily-tech-digest`](daily-tech-digest/SKILL.md) | Fetches and summarizes daily AI/tech news from US, China, GitHub Trending, HuggingFace, and arXiv into an interactive HTML digest with search, keyword filtering, dark mode, and bilingual titles. | ✅ |
 | [`gitignore-hardening`](gitignore-hardening/SKILL.md) | Audits and hardens `.gitignore` to prevent leaking secrets and sensitive info (keystores, .env files, API keys, credentials), and stops tracking files that were already committed. | — |

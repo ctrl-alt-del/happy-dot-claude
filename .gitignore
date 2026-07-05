@@ -17,6 +17,18 @@ Desktop.ini
 *.swo
 *~
 
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+
+# Environment
+.env
+
+# Merge artifacts
+*.orig
+
 # Logs / temp
 *.log
 *.tmp

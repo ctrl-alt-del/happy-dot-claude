@@ -1,0 +1,54 @@
+{
+  "skill_name": "agentic-knowledge-digest",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Give me today's AI and agentic knowledge digest — fetch from the usual sources and generate the interactive HTML page. Focus on RAG, knowledge graphs, agent memory, and knowledge lifecycle research.",
+      "expected_output": "An HTML file saved to ~/Desktop/agentic-knowledge-digest/YYYY-MM-DD.html with interactive digest including stats dashboard, daily keywords, collapsible sections (Highlights, Research Papers, Tools & Frameworks, Models & Embeddings, Blogs & Insights, Industry & Deployments), and color-coded keyword pills. Every item has a bilingual title (English + Chinese), 3-5 keywords with domain assignments from the 10 knowledge/agentic domains, a 1-2 sentence factual summary, and a verified source link.",
+      "files": [],
+      "expectations": [
+        "HTML file exists at ~/Desktop/agentic-knowledge-digest/YYYY-MM-DD.html",
+        "Processed JSON saved before HTML generation",
+        "Total items capped at 25",
+        "Highlights has at most 10 items",
+        "Every item has title_zh (Chinese translation)",
+        "Every item has keywords with domain assignments from the 10 focus domains",
+        "Every item has a source URL",
+        "Sources section at bottom lists all origin URLs",
+        "No fabricated content",
+        "All items relate to AI knowledge or agentic knowledge topics",
+        "At least one item per populated section uses knowledge-graph or knowledge-lifecycle keyword domains where applicable"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I need a digest focused specifically on knowledge lifecycle management — LLM-wiki, Code Wiki, knowledge evolution, consolidation, and decay. Also include anything about GraphRAG, Graphify, Graphitti, and Neo4j. Filter out anything that's just general AI without knowledge management focus.",
+      "expected_output": "An HTML digest where all items connect to knowledge lifecycle management or knowledge graphs. Items cover LLM-wiki, Code Wiki, GraphRAG, Graphify, Graphitti, Neo4j. Keywords use knowledge-lifecycle and knowledge-graph domains prominently. No general AI items without knowledge management relevance.",
+      "files": [],
+      "expectations": [
+        "All items connect to knowledge lifecycle or knowledge graph domains",
+        "knowledge-lifecycle domain keywords appear (lifecycle, wiki, evolution, consolidation, decay, pruning)",
+        "knowledge-graph domain keywords appear (GraphRAG, Neo4j, Graphify, Graphitti, ontology)",
+        "General AI items without knowledge connection are excluded",
+        "Bilingual titles on every item",
+        "Keywords assigned with correct domain mappings"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Give me the agentic knowledge digest for June 15, 2026 — fetch what was published on that specific date. Exclude crypto and general tech. Don't fabricate. If there's nothing qualifying for Highlights that day, omit the section entirely. Cap at 25.",
+      "expected_output": "An HTML digest dated 2026-06-15 with items from that specific date. No cryptocurrency, DeFi, NFT, or general consumer tech items. Highlights section either contains only genuinely significant items from that date or is omitted entirely if nothing qualifies. No fabricated entries — sparse day returns fewer items.",
+      "files": [],
+      "expectations": [
+        "Digest date is 2026-06-15, not today's date",
+        "All items are from or around June 15, 2026 (arXiv submission date, blog publish date)",
+        "No cryptocurrency, DeFi, NFT, or general consumer tech items",
+        "Highlights section omitted if no qualifying major news from that date",
+        "Total items at most 25; fewer is OK if that date had less content",
+        "No fabricated items",
+        "Output file path contains '2026-06-15'",
+        "Processed JSON date field is '2026-06-15'"
+      ]
+    }
+  ]
+}
