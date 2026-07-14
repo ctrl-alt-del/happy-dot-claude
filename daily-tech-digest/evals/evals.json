@@ -9,7 +9,7 @@
       "expectations": [
         "HTML file exists at ~/Desktop/news-digest/YYYY-MM-DD.html",
         "Processed JSON saved before HTML generation",
-        "Total items capped at 25",
+        "Total items capped at 40",
         "Highlights has at most 10 items",
         "Every item has title_zh (Chinese translation)",
         "Every item has keywords with domain assignments",
@@ -33,14 +33,14 @@
     },
     {
       "id": 3,
-      "prompt": "Give me a tech news digest, but exclude any crypto or blockchain speculation. Also, if there's no genuinely major news today (new model releases, major acquisitions, scandals, etc.), don't include a Highlights section. Don't fabricate items to fill space. Cap at 25 total.",
-      "expected_output": "An HTML digest with no cryptocurrency/DeFi/NFT items. The Highlights section is either omitted entirely (if no qualifying major news) or contains only truly significant items. Total items capped at 25, with no fabricated entries.",
+      "prompt": "Give me a tech news digest, but exclude any crypto or blockchain speculation. Also, if there's no genuinely major news today (new model releases, major acquisitions, scandals, etc.), don't include a Highlights section. Don't fabricate items to fill space. Cap at 40 total.",
+      "expected_output": "An HTML digest with no cryptocurrency/DeFi/NFT items. The Highlights section is either omitted entirely (if no qualifying major news) or contains only truly significant items. Total items capped at 40, with no fabricated entries.",
       "files": [],
       "expectations": [
         "No cryptocurrency, DeFi, or NFT items in output",
         "Highlights section exists only if qualifying major news is present",
         "Highlights items are genuinely significant (model releases, major product launches, scandals, $1B+ deals)",
-        "Total items is at most 25",
+        "Total items is at most 40",
         "No fabricated items — sparse sources result in fewer items, not invented ones",
       "All links verified (link_verified: true for every item)"
         ]

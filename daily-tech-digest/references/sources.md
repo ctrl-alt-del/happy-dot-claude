@@ -26,7 +26,6 @@ Curated list of RSS feeds, APIs, and web sources for the daily digest.
 | Source | Feed URL | Language |
 |--------|----------|----------|
 | Electrek | `https://electrek.co/feed/` | en |
-| Teslarati | `https://www.teslarati.com/feed/` | en |
 | SpaceNews | `https://spacenews.com/feed/` | en |
 
 ### China Tech (English)
@@ -34,7 +33,7 @@ Curated list of RSS feeds, APIs, and web sources for the daily digest.
 | Source | Feed URL | Language |
 |--------|----------|----------|
 | TechNode | `https://technode.com/feed/` | en |
-| SCMP Tech | `https://www.scmp.com/rss/4/feed` | en |
+| SCMP Tech | `https://www.scmp.com/rss/4/feed` | en | ⚠ geo-blocked from some regions |
 | Pandaily | `https://pandaily.com/feed/` | en |
 
 ### China Tech (Chinese)
@@ -42,7 +41,7 @@ Curated list of RSS feeds, APIs, and web sources for the daily digest.
 | Source | Feed URL | Language |
 |--------|----------|----------|
 | 36kr | `https://36kr.com/feed` | zh |
-| Huxiu | `https://www.huxiu.com/rss/0.xml` | zh |
+| Huxiu | `https://rss.huxiu.com/` | zh |
 
 ## Web Scraping
 
@@ -136,7 +135,7 @@ Note: Blockchain used for supply chain, identity, or enterprise infrastructure i
 
 | Scope | Limit |
 |-------|-------|
-| Total items (global) | 25 |
+| Total items (global) | 40 |
 | Highlights | Top 10 |
 | Per section (US, China, GitHub, HF, arXiv each) | Top 5 suggested; fluid based on real distribution |
 

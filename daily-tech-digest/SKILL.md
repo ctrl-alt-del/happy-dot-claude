@@ -30,7 +30,7 @@ HTML page. The digest is saved to `~/Desktop/news-digest/YYYY-MM-DD.html`
   bottom lists every origin.
 - **Language-respecting.** Chinese content stays in Chinese. All titles are
   bilingual (English / Chinese) so both audiences can scan.
-- **Capped and ranked.** Maximum 25 items (daily) or 45 items (weekly),
+- **Capped and ranked.** Maximum 40 items (daily) or 45 items (weekly),
   prioritized by relevance to
   focus industries (embodied AI, chip EDA, robotics, AI/ML, semiconductors).
 
@@ -74,7 +74,7 @@ and you are done — do **not** fetch or re-process.
 
 **If the user chooses (B) Start fresh**, also ask about scope before continuing:
 
-- **(1) Single-day digest** (25 items) — today only (or `--date` if specified).
+- **(1) Single-day digest** (40 items) — today only (or `--date` if specified).
 - **(2) Weekly digest** (45 items, Mon-Sun week) — pull all 7 days of the
   calendar week containing the target date. Reuses cached daily raw data if
   available.
@@ -107,6 +107,11 @@ python3 scripts/fetch_digest.py --verify-links --save-raw
 # ...or target a specific date:
 python3 scripts/fetch_digest.py --date 2026-07-04 --verify-links --save-raw
 ```
+
+When `--date` is given, every source (RSS, GitHub, HuggingFace, arXiv) is scoped
+to that **single UTC calendar day only**. Running the fetcher sequentially for
+different dates never produces overlapping (crossover) items, so each
+`YYYY-MM-DD-raw.json` contains that day's news exclusively.
 
 **Weekly (Mon-Sun week containing the given date or today):**
 ```bash
@@ -166,9 +171,9 @@ keywords (e.g. `大模型`, `具身智能`) for ZH items.
 
 **Rank** all items by: `priority_hint` (descending) > recency > content depth.
 
-**Cap** at 25 items (single-day) or 45 items (weekly). Keep the highest-ranked.
+**Cap** at 40 items (single-day) or 45 items (weekly). Keep the highest-ranked.
 
-**Highlights**: From the top 25, select up to 10 items that qualify as
+**Highlights**: From the top 40, select up to 10 items that qualify as
 exceptional significance (see criteria below). Set `is_highlight: true`.
 
 **Section distribution** is fluid — some days US News gets 8 items, arXiv
@@ -202,7 +207,7 @@ memory chips, embodied AI, chip EDA, robotics.
 
 ### Step 5 — Synthesize daily keywords
 
-Look across all 25 selected items and synthesize **8-12 daily keywords** —
+Look across all 40 selected items and synthesize **8-12 daily keywords** —
 semantically meaningful themes that characterize the day's news, not just
 frequency counts. Each daily keyword has the same `{"text": "...", "domain": "..."}`
 structure as item keywords. Use a mix of English and Chinese where appropriate.
@@ -229,9 +234,9 @@ Write the processed data as JSON conforming to this schema:
 {
   "date": "2026-06-27",
   "stats": {
-    "total_items": 25,
+    "total_items": 40,
     "sources_count": 12,
-    "links_verified_count": 25,
+    "links_verified_count": 40,
     "links_failed_count": 0,
     "section_counts": {
       "us_news": 8, "china_news": 7, "github_trending": 3,

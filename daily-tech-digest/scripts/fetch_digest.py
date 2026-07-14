@@ -10,9 +10,12 @@ Usage:
     python3 fetch_digest.py --verify-links            # verify all URLs
     python3 fetch_digest.py --output-dir ~/custom     # custom output dir
     python3 fetch_digest.py --hours 48                # look back 48h instead of 24h
-    python3 fetch_digest.py --date 2026-07-04         # target a specific date
+    python3 fetch_digest.py --date 2026-07-04         # ONLY that UTC day's news
     python3 fetch_digest.py --date 2026-07-04 --week  # Mon-Sun week containing date
     python3 fetch_digest.py --week --save-raw         # this week, save to disk
+
+When --date is given, every source is scoped to that single UTC calendar day, so
+running different dates sequentially never produces overlapping (crossover) items.
 """
 
 import argparse
@@ -150,15 +153,14 @@ RSS_FEEDS = [
     {"url": "https://9to5google.com/feed/", "name": "9to5Google", "section": "us_news", "language": "en"},
     # Tesla / SpaceX
     {"url": "https://electrek.co/feed/", "name": "Electrek", "section": "us_news", "language": "en"},
-    {"url": "https://www.teslarati.com/feed/", "name": "Teslarati", "section": "us_news", "language": "en"},
     {"url": "https://spacenews.com/feed/", "name": "SpaceNews", "section": "us_news", "language": "en"},
     # China (English)
     {"url": "https://technode.com/feed/", "name": "TechNode", "section": "china_news", "language": "en"},
-    {"url": "https://www.scmp.com/rss/4/feed", "name": "SCMP Tech", "section": "china_news", "language": "en"},
+    {"url": "https://www.scmp.com/rss/4/feed", "name": "SCMP Tech", "section": "china_news", "language": "en"},  # geo-blocked from some regions
     {"url": "https://pandaily.com/feed/", "name": "Pandaily", "section": "china_news", "language": "en"},
     # China (Chinese)
     {"url": "https://36kr.com/feed", "name": "36kr", "section": "china_news", "language": "zh"},
-    {"url": "https://www.huxiu.com/rss/0.xml", "name": "Huxiu", "section": "china_news", "language": "zh"},
+    {"url": "https://rss.huxiu.com/", "name": "Huxiu", "section": "china_news", "language": "zh"},
 ]
 
 
@@ -169,7 +171,7 @@ def fetch_rss_feeds(feeds, hours=24, target_date=None):
         day_start = date_dt.replace(hour=0, minute=0, second=0, microsecond=0)
         day_end = date_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
         cutoff = day_start
-        upper = day_end + timedelta(days=1)  # allow next day too for timezone fuzz
+        upper = day_end  # single UTC calendar day only — no crossover into adjacent dates
     else:
         cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
         upper = None
@@ -186,7 +188,10 @@ def fetch_rss_feeds(feeds, hours=24, target_date=None):
             for entry in feed.entries:
                 pub_date = _parse_entry_date(entry)
                 if target_date:
-                    if pub_date and (pub_date < cutoff or pub_date > upper):
+                    # In date mode, an item must have a publish date that falls
+                    # within the target UTC day. Undated items are dropped so they
+                    # can't leak into every date's digest.
+                    if pub_date is None or pub_date < cutoff or pub_date > upper:
                         continue
                 else:
                     if pub_date and pub_date < cutoff:
@@ -338,9 +343,19 @@ def _fetch_github_search(target_date):
 def fetch_huggingface_trending(target_date=None):
     items = []
     try:
+        # In date mode, sort by lastModified so recently-updated models surface,
+        # and pull a larger candidate pool to filter down to the exact day.
+        # Otherwise keep the top-downloaded models (all-time trending) for today.
+        if target_date:
+            day = datetime.strptime(target_date, "%Y-%m-%d").date()
+            params = {"sort": "lastModified", "direction": "-1", "limit": 100, "full": "false"}
+        else:
+            day = None
+            params = {"sort": "downloads", "direction": "-1", "limit": 15, "full": "false"}
+
         resp = requests.get(
             "https://huggingface.co/api/models",
-            params={"sort": "downloads", "direction": "-1", "limit": 15, "full": "false"},
+            params=params,
             timeout=15,
         )
         resp.raise_for_status()
@@ -354,9 +369,15 @@ def fetch_huggingface_trending(target_date=None):
             tags = model.get("tags", [])[:5]
             downloads = model.get("downloads", 0)
             likes = model.get("likes", 0)
-            last_modified = model.get("lastModified", datetime.now(timezone.utc).isoformat())
+            last_modified = model.get("lastModified") or datetime.now(timezone.utc).isoformat()
+
             if target_date:
-                last_modified = datetime.strptime(target_date, "%Y-%m-%d").replace(tzinfo=timezone.utc).isoformat()
+                # Keep only models whose real lastModified falls on the target
+                # UTC day. Never fake the date — that would duplicate the same
+                # models across every date and cause crossover.
+                lm_dt = _parse_iso_datetime(last_modified)
+                if lm_dt is None or lm_dt.date() != day:
+                    continue
 
             parts = [f"Downloads: {downloads}", f"Likes: {likes}"]
             if tags:
@@ -375,6 +396,16 @@ def fetch_huggingface_trending(target_date=None):
         print(f"  [warn] HuggingFace: {exc}", file=sys.stderr)
 
     return items
+
+
+def _parse_iso_datetime(value):
+    """Parse an ISO-8601 timestamp (with optional trailing 'Z') to aware UTC."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except Exception:
+        return None
 
 
 # ── arXiv API ───────────────────────────────────────────────────────────────
@@ -422,60 +453,101 @@ ARXIV_AFFILIATIONS = {
 }
 
 
-def fetch_arxiv(categories, affiliations, max_per_cat=15, target_date=None):
+def fetch_arxiv(categories, affiliations, max_per_cat=15, target_date=None,
+                max_pages=10):
     items = []
     base_url = "http://export.arxiv.org/api/query"
 
+    if target_date:
+        day = datetime.strptime(target_date, "%Y-%m-%d").date()
+
     for category in categories:
+        collected = 0
         try:
-            params = {
-                "search_query": f"cat:{category}",
-                "sortBy": "submittedDate",
-                "sortOrder": "descending",
-                "start": 0,
-                "max_results": max_per_cat,
-            }
-            resp = requests.get(base_url, params=params, timeout=30)
-            resp.raise_for_status()
-            feed = feedparser.parse(resp.text)
-
-            for entry in feed.entries:
-                arxiv_id = entry.id.split("/abs/")[-1]
-                if "v" in arxiv_id:
-                    arxiv_id = arxiv_id.split("v")[0]
-
-                authors_list = [a.get("name", "") for a in entry.get("authors", [])]
-                authors_str = ", ".join(authors_list[:5])
-                if len(authors_list) > 5:
-                    authors_str += " et al."
-
-                all_text = f"{entry.get('title', '')} {entry.get('summary', '')} {' '.join(authors_list)}".lower()
-
-                matched = []
-                for keyword, org_name in affiliations.items():
-                    if keyword.lower() in all_text:
-                        if org_name not in matched:
-                            matched.append(org_name)
-
-                abstract = _strip_html(entry.get("summary", ""))
-
-                items.append(NewsItem(
-                    title=_clean_text(entry.get("title", "")),
-                    url=entry.get("id", entry.get("link", "")),
-                    source="arXiv",
-                    date=entry.get("published", datetime.now(timezone.utc).isoformat()),
-                    language="en",
-                    section="arxiv_top" if matched else "arxiv_other",
-                    raw_content=f"Authors: {authors_str}\n\n{abstract}",
-                    arxiv_id=arxiv_id,
-                    organization=", ".join(matched) if matched else "",
-                ))
-
-            time.sleep(0.6)  # arXiv rate limit courtesy
+            if target_date:
+                # Results are sorted newest-first. Page deeper (up to a safety
+                # cap) until we reach the target day, keeping only papers whose
+                # published date matches it exactly. Stop once we page past it.
+                stop = False
+                for page in range(max_pages):
+                    params = {
+                        "search_query": f"cat:{category}",
+                        "sortBy": "submittedDate",
+                        "sortOrder": "descending",
+                        "start": page * max_per_cat,
+                        "max_results": max_per_cat,
+                    }
+                    resp = requests.get(base_url, params=params, timeout=30)
+                    resp.raise_for_status()
+                    feed = feedparser.parse(resp.text)
+                    if not feed.entries:
+                        break
+                    for entry in feed.entries:
+                        pub = _parse_entry_date(entry)
+                        pub_day = pub.date() if pub else None
+                        if pub_day is None:
+                            continue
+                        if pub_day > day:
+                            continue  # newer than target — keep paging
+                        if pub_day < day:
+                            stop = True  # older than target — nothing more to find
+                            continue
+                        items.append(_build_arxiv_item(entry, affiliations))
+                        collected += 1
+                    if stop:
+                        break
+                    time.sleep(0.6)  # arXiv rate limit courtesy
+            else:
+                params = {
+                    "search_query": f"cat:{category}",
+                    "sortBy": "submittedDate",
+                    "sortOrder": "descending",
+                    "start": 0,
+                    "max_results": max_per_cat,
+                }
+                resp = requests.get(base_url, params=params, timeout=30)
+                resp.raise_for_status()
+                feed = feedparser.parse(resp.text)
+                for entry in feed.entries:
+                    items.append(_build_arxiv_item(entry, affiliations))
+                time.sleep(0.6)  # arXiv rate limit courtesy
         except Exception as exc:
             print(f"  [warn] arXiv {category}: {exc}", file=sys.stderr)
 
     return items
+
+
+def _build_arxiv_item(entry, affiliations):
+    arxiv_id = entry.id.split("/abs/")[-1]
+    if "v" in arxiv_id:
+        arxiv_id = arxiv_id.split("v")[0]
+
+    authors_list = [a.get("name", "") for a in entry.get("authors", [])]
+    authors_str = ", ".join(authors_list[:5])
+    if len(authors_list) > 5:
+        authors_str += " et al."
+
+    all_text = f"{entry.get('title', '')} {entry.get('summary', '')} {' '.join(authors_list)}".lower()
+
+    matched = []
+    for keyword, org_name in affiliations.items():
+        if keyword.lower() in all_text:
+            if org_name not in matched:
+                matched.append(org_name)
+
+    abstract = _strip_html(entry.get("summary", ""))
+
+    return NewsItem(
+        title=_clean_text(entry.get("title", "")),
+        url=entry.get("id", entry.get("link", "")),
+        source="arXiv",
+        date=entry.get("published", datetime.now(timezone.utc).isoformat()),
+        language="en",
+        section="arxiv_top" if matched else "arxiv_other",
+        raw_content=f"Authors: {authors_str}\n\n{abstract}",
+        arxiv_id=arxiv_id,
+        organization=", ".join(matched) if matched else "",
+    )
 
 
 # ── Deduplication ───────────────────────────────────────────────────────────
@@ -543,7 +615,9 @@ def main():
     )
     parser.add_argument(
         "--date",
-        help="Target date as YYYY-MM-DD (default: today)",
+        help="Target date as YYYY-MM-DD (default: today). Scopes ALL sources to "
+             "that single UTC calendar day; safe to run sequentially for "
+             "different dates without crossover.",
     )
     parser.add_argument(
         "--week", action="store_true",
