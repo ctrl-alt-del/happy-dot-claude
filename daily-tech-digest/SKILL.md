@@ -119,67 +119,67 @@ python3 scripts/fetch_digest.py --date 2026-07-04 --week --save-raw
 ```
 
 This produces `~/Desktop/news-digest/YYYY-MM-DD-raw.json` (daily) or
-`~/Desktop/news-digest/YYYY-MM-DD-WNN-week-raw.json` (weekly) and prints the
-JSON to stdout. The JSON contains an `items` array with fields: `title`,
-`url`, `source`, `date`, `language`, `section`, `raw_content`, `organization`,
-`arxiv_id`, `link_verified`, `focus_match`, `priority_hint`.
+`~/Desktop/news-digest/YYYY-MM-DD-WNN-week-raw.json` (weekly). The JSON contains
+an `items` array with fields: `title`, `url`, `source`, `date`, `language`,
+`section`, `raw_content`, `organization`, `arxiv_id`, `link_verified`,
+`focus_match`, `priority_hint`.
 
-- `focus_match` lists which focus industries the item matches
-  (e.g. `["embodied-ai", "robotics"]`).
-- `priority_hint` is a numeric score — higher = more relevant. Use it to
-  rank items.
-- `link_verified` is `true` if the URL responded to a HEAD request.
-  Items with dead links are already removed by `--verify-links`.
+The fetcher now uses **parallel I/O** by default:
+- RSS feeds: 8 concurrent workers, 30s per-feed timeout
+- Link verification: 20 concurrent HEAD requests, 5s per-URL timeout
+- RSS, GitHub, and HuggingFace run concurrently
+- arXiv uses combined-category query (1 API call instead of 6)
 
 If any source fails, the script logs a warning to stderr and continues.
 
-### Step 2 — Process each item
+### Step 1.5 — Pre-process raw items (mechanical work)
 
-For every item in the raw JSON, produce a processed item with these fields:
+Run the pre-processor to handle all mechanical tasks — filtering, ranking,
+capping, keyword extraction hints, highlight detection, section grouping:
 
-| Field | How to produce |
-|-------|---------------|
-| `title` | Original title from source |
-| `title_zh` | **Chinese translation** of the title (for EN items) or original Chinese title (for ZH items). Every item gets a Chinese title. |
-| `url` | Original URL |
-| `source` | Original source name |
-| `section` | Original section |
-| `organization` | Assign or keep from fetcher |
-| `language` | Original language |
-| `arxiv_id` | From fetcher if present |
-| `summary` | **1-2 sentence factual summary** in the item's language. Paraphrase, never copy-paste. If source is thin, write one sentence. Never add information not present. |
-| `keywords` | Array of `{"text": "...", "domain": "..."}`. 3-5 keywords, each with a domain assignment. See keyword domains below. |
-| `link_verified` | From fetcher |
-| `is_highlight` | `true` if this item qualifies for the Highlights section (see criteria below) |
+```bash
+python3 scripts/process_digest.py ~/Desktop/news-digest/YYYY-MM-DD-raw.json \
+  -o ~/Desktop/news-digest/YYYY-MM-DD-semi.json
+```
 
-**Keyword domain assignment:** For each keyword, assign one of these domains:
+For weekly:
+```bash
+python3 scripts/process_digest.py ~/Desktop/news-digest/YYYY-MM-DD-WNN-week-raw.json \
+  -o ~/Desktop/news-digest/YYYY-MM-DD-WNN-week-semi.json --weekly
+```
 
-| Domain | Applies to keywords about |
-|--------|---------------------------|
-| `ai-ml` | AI models, training, inference, transformers, LLMs, diffusion, RL |
-| `hardware` | Chips, EDA, semiconductor, fabrication, memory chips, HBM |
-| `robotics` | Embodied AI, humanoid robots, manipulation, autonomous driving, 机器人 |
-| `software` | Open-source, frameworks, compilers, benchmarks, APIs, engineering |
-| `org-product` | Specific companies, product names, model names (OpenAI, GPT-5) |
-| `safety` | Alignment, regulation, data breach, policy, red-teaming |
-| `other` | Anything that doesn't fit the above |
+This script performs the following **without any LLM involvement**:
+1. **Content filtering** — removes crypto/NFT/DeFi speculation items
+2. **Ranking** — sorts by `priority_hint` descending, then recency
+3. **Capping** — keeps top 40 (daily) or 45 (weekly) items
+4. **Keyword hints** — extracts candidate keywords from titles and raw_content
+   (stored in the `keywords` field as starting hints for the agent)
+5. **Highlight detection** — pre-scores items for significance and sets
+   `is_highlight` on top candidates (up to 10)
+6. **Section grouping** — organizes items into sections, builds stats, collects
+   sources
 
-Keywords match the item's language: English keywords for EN items, Chinese
-keywords (e.g. `大模型`, `具身智能`) for ZH items.
+The `-semi.json` output has the same schema as the final `-processed.json` but
+with placeholder summaries and title translations. The agent only needs to
+fill in the creative work.
 
-### Step 3 — Rank, cap, and select
+### Step 2 — Add summaries and translations (creative work only)
 
-**Rank** all items by: `priority_hint` (descending) > recency > content depth.
+Read the semi-processed JSON and for **every item** add:
 
-**Cap** at 40 items (single-day) or 45 items (weekly). Keep the highest-ranked.
+1. **`title_zh`** — Chinese translation of the title (for EN items) or the
+   original Chinese title (for ZH items). Every item gets a Chinese title.
+2. **`summary`** — 1-2 sentence factual summary in the item's language.
+   Paraphrase from `raw_content`, never copy-paste. If source is thin, write
+   one sentence. Never add information not present in the source.
+3. **`keywords`** — Review and refine the pre-extracted keyword hints. Ensure
+   3-5 accurate keywords per item, each with a domain assignment. Keywords
+   match the item's language.
 
-**Highlights**: From the top 40, select up to 10 items that qualify as
-exceptional significance (see criteria below). Set `is_highlight: true`.
+### Step 3 — Verify highlights and daily keywords
 
-**Section distribution** is fluid — some days US News gets 8 items, arXiv
-gets 1. Reflect real news patterns, do not force equal distribution.
-
-An item qualifies as a Highlight if it represents:
+**Highlights**: Review the pre-scored `is_highlight` flags. Remove highlights
+from items that don't genuinely qualify. Keep only items that represent:
 
 - New model release (GPT, Claude, Gemini, DeepSeek, Llama, Qwen class)
 - Major product or hardware launch
@@ -189,106 +189,25 @@ An item qualifies as a Highlight if it represents:
 - Regulatory action with broad industry impact
 - Major open-source release (framework, model weights, dataset)
 
-If nothing qualifies, omit Highlights entirely. Highlights items also appear
-in their regular section (duplicated, not removed).
+If no items truly qualify, set `is_highlight: false` on all — the Highlights
+section will be omitted.
 
-### Step 4 — Apply content filters
+**Daily keywords**: Review and replace the pre-synthesized daily keywords.
+Look across all items and produce 8-12 semantically meaningful themes that
+characterize the day's news, not just frequency counts. Use a mix of English
+and Chinese where appropriate.
 
-**Skip** items whose primary subject is:
-- Cryptocurrency (Bitcoin, Ethereum, altcoins)
-- Token speculation or DeFi
-- NFTs or web3 fundraising
-- Blockchain used for financial speculation
+### Step 4 — Write processed JSON and generate HTML
 
-**Keep** blockchain for supply chain, identity, enterprise infrastructure.
+The semi-processed JSON from Step 1.5 already has the correct schema structure
+(sections, stats, sources, keyword hints). After adding summaries and translations:
 
-**Keep**: AI/ML, software engineering, semiconductors/chips, AI memory,
-memory chips, embodied AI, chip EDA, robotics.
-
-### Step 5 — Synthesize daily keywords
-
-Look across all 40 selected items and synthesize **8-12 daily keywords** —
-semantically meaningful themes that characterize the day's news, not just
-frequency counts. Each daily keyword has the same `{"text": "...", "domain": "..."}`
-structure as item keywords. Use a mix of English and Chinese where appropriate.
-
-### Step 6 — Group into sections
-
-Organize items into sections in this order:
-
-1. `highlights` — items with `is_highlight: true` (up to 10)
-2. `us_news` — Silicon Valley & US News
-3. `china_news` — China Tech News
-4. `github_trending` — GitHub Trending
-5. `hf_trending` — HuggingFace Trending
-6. `arxiv_top` — arXiv — Top Institution Papers
-7. `arxiv_other` — arXiv — Other Notable Papers
-
-Skip any section with zero items.
-
-### Step 7 — Write processed JSON and generate HTML
-
-Write the processed data as JSON conforming to this schema:
-
-```json
-{
-  "date": "2026-06-27",
-  "stats": {
-    "total_items": 40,
-    "sources_count": 12,
-    "links_verified_count": 40,
-    "links_failed_count": 0,
-    "section_counts": {
-      "us_news": 8, "china_news": 7, "github_trending": 3,
-      "hf_trending": 3, "arxiv_top": 2, "arxiv_other": 2
-    }
-  },
-  "daily_keywords": [
-    {"text": "model-release", "domain": "org-product"},
-    {"text": "embodied-ai", "domain": "robotics"}
-  ],
-  "sections": [
-    {
-      "id": "highlights",
-      "label": "! Highlights",
-      "items": [
-        {
-          "title": "GPT-5 Released",
-          "title_zh": "GPT-5 正式发布",
-          "url": "https://www.theverge.com/...",
-          "source": "The Verge",
-          "section": "us_news",
-          "organization": "OpenAI",
-          "language": "en",
-          "arxiv_id": "",
-          "summary": "OpenAI released GPT-5 today...",
-          "keywords": [
-            {"text": "multimodal", "domain": "ai-ml"},
-            {"text": "benchmark-sota", "domain": "software"}
-          ],
-          "link_verified": true,
-          "is_highlight": true
-        }
-      ]
-    },
-    {
-      "id": "us_news",
-      "label": "Silicon Valley & US News",
-      "items": [...]
-    }
-  ],
-  "sources": [
-    {"name": "TechCrunch", "url": "https://techcrunch.com"},
-    {"name": "The Verge", "url": "https://www.theverge.com"}
-  ]
-}
-```
-
-Save this as `~/Desktop/news-digest/YYYY-MM-DD-processed.json`, then run:
-
-```bash
-python3 scripts/generate_html.py ~/Desktop/news-digest/YYYY-MM-DD-processed.json
-```
+1. Read `~/Desktop/news-digest/YYYY-MM-DD-semi.json`
+2. For each item in every section, fill in `title_zh` and `summary`
+3. Refine `keywords` and `daily_keywords`
+4. Verify `is_highlight` flags
+5. Save as `~/Desktop/news-digest/YYYY-MM-DD-processed.json`
+6. Run `python3 scripts/generate_html.py ~/Desktop/news-digest/YYYY-MM-DD-processed.json`
 
 This writes `~/Desktop/news-digest/YYYY-MM-DD.html` (daily) or
 `~/Desktop/news-digest/YYYY-MM-DD-WNN-week.html` (weekly). The filename comes
@@ -305,7 +224,7 @@ Display a brief stats summary in the conversation (total items, section
 counts, top daily keywords) so the user gets a preview without opening
 the file.
 
-### Step 8 — HTML page features
+### Step 5 — HTML page features
 
 The generated page provides:
 

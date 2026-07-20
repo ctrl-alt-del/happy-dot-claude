@@ -25,6 +25,7 @@ import os
 import socket
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -36,7 +37,11 @@ from bs4 import BeautifulSoup
 
 # ── Config ──────────────────────────────────────────────────────────────────
 
-MAX_FETCH_TIMEOUT = 180  # seconds — hard ceiling (3 min) for any single URL fetch
+MAX_FETCH_TIMEOUT = 30   # seconds — per-feed HTTP timeout
+MAX_LINK_TIMEOUT = 5     # seconds — per-URL HEAD request timeout
+RSS_WORKERS = 8          # concurrent RSS feed fetches
+LINK_WORKERS = 20        # concurrent link-verification HEAD requests
+ARXIV_MAX_PAGES = 3      # max pages per arXiv category in date mode (was 10)
 
 # ── Data model ──────────────────────────────────────────────────────────────
 
@@ -113,29 +118,42 @@ def detect_focus_topics(items):
 
 # ── Link verification ────────────────────────────────────────────────────────
 
+def _verify_one_link(item):
+    """Check a single URL. Returns (item, ok)."""
+    try:
+        resp = requests.head(item.url, timeout=MAX_LINK_TIMEOUT, allow_redirects=True,
+                             headers={"User-Agent": "daily-tech-digest/1.0"})
+        if 200 <= resp.status_code < 400:
+            item.link_verified = True
+            return (item, True)
+        else:
+            print(f"  [dead] {item.url} → HTTP {resp.status_code}", file=sys.stderr)
+            item.link_verified = False
+            return (item, False)
+    except Exception:
+        print(f"  [dead] {item.url} → unreachable", file=sys.stderr)
+        item.link_verified = False
+        return (item, False)
+
+
 def verify_links(items):
-    """Send HEAD request to each item URL. Items with 4xx/5xx/timeout are removed.
-    Returns filtered list."""
-    ok = []
+    """Send HEAD request to each item URL in parallel. Items with 4xx/5xx/timeout
+    are removed. Returns filtered list."""
+    if not items:
+        return []
     total = len(items)
+    ok = []
     failed = 0
-    for i, item in enumerate(items):
-        try:
-            resp = requests.head(item.url, timeout=10, allow_redirects=True,
-                                headers={"User-Agent": "daily-tech-digest/1.0"})
-            if 200 <= resp.status_code < 400:
-                item.link_verified = True
+    with ThreadPoolExecutor(max_workers=LINK_WORKERS) as pool:
+        futures = [pool.submit(_verify_one_link, item) for item in items]
+        for i, future in enumerate(as_completed(futures)):
+            item, is_ok = future.result()
+            if is_ok:
                 ok.append(item)
             else:
-                print(f"  [dead] {item.url} → HTTP {resp.status_code}", file=sys.stderr)
-                item.link_verified = False
                 failed += 1
-        except Exception:
-            print(f"  [dead] {item.url} → unreachable", file=sys.stderr)
-            item.link_verified = False
-            failed += 1
-        if (i + 1) % 10 == 0:
-            print(f"  verified {i + 1}/{total} ...", file=sys.stderr)
+            if (i + 1) % 20 == 0:
+                print(f"  verified {i + 1}/{total} ...", file=sys.stderr)
     print(f"  link check: {len(ok)} OK, {failed} removed", file=sys.stderr)
     return ok
 
@@ -164,58 +182,73 @@ RSS_FEEDS = [
 ]
 
 
-def fetch_rss_feeds(feeds, hours=24, target_date=None):
+def _fetch_one_rss_feed(cfg, cutoff, upper, target_date):
+    """Fetch a single RSS feed. Returns (feed_name, items, error_str)."""
     items = []
+    name = cfg["name"]
+    try:
+        resp = requests.get(
+            cfg["url"],
+            timeout=MAX_FETCH_TIMEOUT,
+            headers={"User-Agent": "daily-tech-digest/1.0"},
+        )
+        resp.raise_for_status()
+        feed = feedparser.parse(resp.content)
+        for entry in feed.entries:
+            pub_date = _parse_entry_date(entry)
+            if target_date:
+                if pub_date is None or pub_date < cutoff or pub_date > upper:
+                    continue
+            else:
+                if pub_date and pub_date < cutoff:
+                    continue
+
+            content = ""
+            if hasattr(entry, "summary"):
+                content = entry.summary
+            elif hasattr(entry, "content") and entry.content:
+                content = entry.content[0].get("value", "")
+            elif hasattr(entry, "description"):
+                content = entry.description
+
+            items.append(NewsItem(
+                title=_clean_text(entry.get("title", "")),
+                url=entry.get("link", ""),
+                source=name,
+                date=pub_date.isoformat() if pub_date else datetime.now(timezone.utc).isoformat(),
+                language=cfg["language"],
+                section=cfg["section"],
+                raw_content=_strip_html(content),
+            ))
+        return (name, items, None)
+    except Exception as exc:
+        return (name, [], str(exc))
+
+
+def fetch_rss_feeds(feeds, hours=24, target_date=None):
     if target_date:
         date_dt = datetime.strptime(target_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
         day_start = date_dt.replace(hour=0, minute=0, second=0, microsecond=0)
         day_end = date_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
         cutoff = day_start
-        upper = day_end  # single UTC calendar day only — no crossover into adjacent dates
+        upper = day_end
     else:
         cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
         upper = None
 
-    for cfg in feeds:
-        try:
-            resp = requests.get(
-                cfg["url"],
-                timeout=MAX_FETCH_TIMEOUT,
-                headers={"User-Agent": "daily-tech-digest/1.0"},
-            )
-            resp.raise_for_status()
-            feed = feedparser.parse(resp.content)
-            for entry in feed.entries:
-                pub_date = _parse_entry_date(entry)
-                if target_date:
-                    # In date mode, an item must have a publish date that falls
-                    # within the target UTC day. Undated items are dropped so they
-                    # can't leak into every date's digest.
-                    if pub_date is None or pub_date < cutoff or pub_date > upper:
-                        continue
-                else:
-                    if pub_date and pub_date < cutoff:
-                        continue
-
-                content = ""
-                if hasattr(entry, "summary"):
-                    content = entry.summary
-                elif hasattr(entry, "content") and entry.content:
-                    content = entry.content[0].get("value", "")
-                elif hasattr(entry, "description"):
-                    content = entry.description
-
-                items.append(NewsItem(
-                    title=_clean_text(entry.get("title", "")),
-                    url=entry.get("link", ""),
-                    source=cfg["name"],
-                    date=pub_date.isoformat() if pub_date else datetime.now(timezone.utc).isoformat(),
-                    language=cfg["language"],
-                    section=cfg["section"],
-                    raw_content=_strip_html(content),
-                ))
-        except Exception as exc:
-            print(f"  [warn] {cfg['name']}: {exc}", file=sys.stderr)
+    items = []
+    with ThreadPoolExecutor(max_workers=RSS_WORKERS) as pool:
+        futures = {
+            pool.submit(_fetch_one_rss_feed, cfg, cutoff, upper, target_date): cfg
+            for cfg in feeds
+        }
+        for future in as_completed(futures):
+            name, feed_items, err = future.result()
+            if err:
+                print(f"  [warn] {name}: {err}", file=sys.stderr)
+            else:
+                print(f"  [ok]   {name}: {len(feed_items)} items", file=sys.stderr)
+            items.extend(feed_items)
 
     return items
 
@@ -454,20 +487,18 @@ ARXIV_AFFILIATIONS = {
 
 
 def fetch_arxiv(categories, affiliations, max_per_cat=15, target_date=None,
-                max_pages=10):
+                max_pages=None):
+    if max_pages is None:
+        max_pages = ARXIV_MAX_PAGES
     items = []
     base_url = "http://export.arxiv.org/api/query"
 
     if target_date:
         day = datetime.strptime(target_date, "%Y-%m-%d").date()
 
-    for category in categories:
-        collected = 0
-        try:
-            if target_date:
-                # Results are sorted newest-first. Page deeper (up to a safety
-                # cap) until we reach the target day, keeping only papers whose
-                # published date matches it exactly. Stop once we page past it.
+    if target_date:
+        for category in categories:
+            try:
                 stop = False
                 for page in range(max_pages):
                     params = {
@@ -488,31 +519,33 @@ def fetch_arxiv(categories, affiliations, max_per_cat=15, target_date=None,
                         if pub_day is None:
                             continue
                         if pub_day > day:
-                            continue  # newer than target — keep paging
+                            continue
                         if pub_day < day:
-                            stop = True  # older than target — nothing more to find
+                            stop = True
                             continue
                         items.append(_build_arxiv_item(entry, affiliations))
-                        collected += 1
                     if stop:
                         break
-                    time.sleep(0.6)  # arXiv rate limit courtesy
-            else:
-                params = {
-                    "search_query": f"cat:{category}",
-                    "sortBy": "submittedDate",
-                    "sortOrder": "descending",
-                    "start": 0,
-                    "max_results": max_per_cat,
-                }
-                resp = requests.get(base_url, params=params, timeout=30)
-                resp.raise_for_status()
-                feed = feedparser.parse(resp.text)
-                for entry in feed.entries:
-                    items.append(_build_arxiv_item(entry, affiliations))
-                time.sleep(0.6)  # arXiv rate limit courtesy
+                    time.sleep(0.6)
+            except Exception as exc:
+                print(f"  [warn] arXiv {category}: {exc}", file=sys.stderr)
+    else:
+        cat_query = " OR ".join(f"cat:{c}" for c in categories)
+        params = {
+            "search_query": cat_query,
+            "sortBy": "submittedDate",
+            "sortOrder": "descending",
+            "start": 0,
+            "max_results": max_per_cat * len(categories),
+        }
+        try:
+            resp = requests.get(base_url, params=params, timeout=30)
+            resp.raise_for_status()
+            feed = feedparser.parse(resp.text)
+            for entry in feed.entries:
+                items.append(_build_arxiv_item(entry, affiliations))
         except Exception as exc:
-            print(f"  [warn] arXiv {category}: {exc}", file=sys.stderr)
+            print(f"  [warn] arXiv: {exc}", file=sys.stderr)
 
     return items
 
@@ -587,7 +620,7 @@ def _load_cached_items(date_str, output_dir):
 # ── Main ────────────────────────────────────────────────────────────────────
 
 def main():
-    socket.setdefaulttimeout(MAX_FETCH_TIMEOUT)
+    socket.setdefaulttimeout(MAX_FETCH_TIMEOUT * 2)  # socket-level safety net
 
     parser = argparse.ArgumentParser(
         description="Collect daily AI/tech news from RSS, GitHub, HuggingFace, and arXiv."
@@ -626,6 +659,8 @@ def main():
     )
     args = parser.parse_args()
 
+    explicit_date = args.date is not None  # track whether user gave --date
+
     if args.date:
         try:
             datetime.strptime(args.date, "%Y-%m-%d")
@@ -634,7 +669,7 @@ def main():
         print(f"Target date: {args.date}", file=sys.stderr)
     else:
         args.date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        print(f"Target date: {args.date} (today)", file=sys.stderr)
+        print(f"Target date: {args.date} (today, using {args.hours}h window)", file=sys.stderr)
 
     all_items = []
 
@@ -684,29 +719,33 @@ def main():
 
         result_date = monday.strftime("%Y-%m-%d")
     else:
-        # RSS
-        print("Fetching RSS feeds ...", file=sys.stderr)
-        rss_items = fetch_rss_feeds(RSS_FEEDS, args.hours, args.date)
-        print(f"  {len(rss_items)} items", file=sys.stderr)
-        all_items.extend(rss_items)
+        # When --date is explicit, use strict date-mode. Otherwise use hours window.
+        fetch_date = args.date if explicit_date else None
 
-        # GitHub Trending
-        print("Fetching GitHub Trending ...", file=sys.stderr)
-        gh_items = fetch_github_trending(args.date)
-        print(f"  {len(gh_items)} items", file=sys.stderr)
-        all_items.extend(gh_items)
+        # Run RSS, GitHub, and HuggingFace concurrently
+        print("Fetching RSS feeds, GitHub Trending, HuggingFace ...", file=sys.stderr)
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            rss_fut = pool.submit(fetch_rss_feeds, RSS_FEEDS, args.hours, fetch_date)
+            gh_fut = pool.submit(fetch_github_trending, fetch_date)
+            hf_fut = pool.submit(fetch_huggingface_trending, fetch_date)
 
-        # HuggingFace
-        print("Fetching HuggingFace trending ...", file=sys.stderr)
-        hf_items = fetch_huggingface_trending(args.date)
-        print(f"  {len(hf_items)} items", file=sys.stderr)
-        all_items.extend(hf_items)
+            rss_items = rss_fut.result()
+            print(f"  RSS: {len(rss_items)} items", file=sys.stderr)
+            all_items.extend(rss_items)
 
-        # arXiv
+            gh_items = gh_fut.result()
+            print(f"  GitHub: {len(gh_items)} items", file=sys.stderr)
+            all_items.extend(gh_items)
+
+            hf_items = hf_fut.result()
+            print(f"  HF: {len(hf_items)} items", file=sys.stderr)
+            all_items.extend(hf_items)
+
+        # arXiv is rate-limited — keep sequential
         print("Fetching arXiv papers ...", file=sys.stderr)
         arxiv_items = fetch_arxiv(ARXIV_CATEGORIES, ARXIV_AFFILIATIONS,
-                                  target_date=args.date)
-        print(f"  {len(arxiv_items)} items", file=sys.stderr)
+                                  target_date=fetch_date)
+        print(f"  arXiv: {len(arxiv_items)} items", file=sys.stderr)
         all_items.extend(arxiv_items)
 
         result_date = args.date
