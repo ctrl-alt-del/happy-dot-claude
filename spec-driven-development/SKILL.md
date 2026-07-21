@@ -2,7 +2,7 @@
 name: spec-driven-development
 description: >
   Sets up a spec-driven development (SDD) workflow in any project. Creates the specs/ folder
-  structure, MEMORY.md for accumulated knowledge, and AGENTS.md integration so AI tools
+  structure, constitution.md, MEMORY.md, and AGENTS.md integration so AI tools
   follow a write-spec-before-code workflow. Use this skill when the user asks to set up
   spec-driven development, write specs before coding, add SDD, GitHub spec kit, structured
   feature development, or when they want a formal process for building features with
@@ -14,8 +14,8 @@ description: >
 # Spec-Driven Development Setup
 
 Sets up a complete spec-driven development workflow in any project. Creates the
-folder structure, templates, and AGENTS.md integration so AI tools follow a
-write-spec-before-code process for every feature.
+folder structure, templates, constitution, and AGENTS.md integration so AI tools
+follow a write-spec-before-code process for every feature.
 
 > **Related skills:**
 > - This skill only *sets up* the scaffolding. To actually build a feature,
@@ -67,6 +67,7 @@ with YAML frontmatter on the next evolution cycle.
 
 ```
 {project_root}/
+├── constitution.md                    # Project governing principles (7 articles)
 ├── MEMORY.md                          # Accumulated project knowledge
 ├── AGENTS.md / CLAUDE.md              # Updated with trigger section
 └── specs/                             # Feature specifications
@@ -77,6 +78,7 @@ with YAML frontmatter on the next evolution cycle.
         ├── spec.md
         ├── tasks.md
         ├── test_plan.md
+        ├── checklist.md
         ├── takeaways.md
         └── ux-ui/                     # Mockups and screenshots
 ```
@@ -92,6 +94,20 @@ Before creating anything, scan the project to understand:
 - **Existing AGENTS.md / CLAUDE.md**: integrate with or create
 - **Existing docs/**: leave permanent docs alone; specs/ is separate
 
+### Step 1.5: Create the Constitution
+
+Copy `assets/templates/constitution.md` to `{project_root}/constitution.md`.
+This is the project's governing principles document. Every spec.md, plan.md, and
+implementation MUST satisfy these principles. Violations require documented
+justification in plan.md's Complexity Tracking section.
+
+The 7 articles (Spec-First, Test-First, Modularity, Simplicity, Anti-Abstraction,
+Integration Reality, Observability) are opinionated defaults — teams should
+review and amend as needed through the Amendment Log.
+
+If the project was set up with an older version of this skill and already has
+MEMORY.md but no constitution.md, create it now.
+
 ### Step 2: Create the Folder Structure
 
 Create `specs/` at project root with `_template/` and `ux-ui/` subdirectory.
@@ -100,8 +116,19 @@ Create `_template/ux-ui/` as an empty directory for mockups.
 ### Step 3: Write Template Files
 
 Fill in the template files in `_template/`. Use `assets/templates/` from this skill
-as the source. **Replace placeholders** with project-specific values:
+as the source. **Replace placeholders** with project-specific values. The templates now include:
 
+- `plan.md` — with Constitution Check gates, Technical Context, Data Model,
+  API/CLI Contracts, Alternatives Considered, Complexity Tracking, and
+  Quickstart Validation sections.
+- `spec.md` — with prioritized user stories (P1/P2/P3), `[NEEDS CLARIFICATION]`
+  markers, numbered functional requirements (FR-XXX), edge cases, non-functional
+  requirements, success criteria, and assumptions.
+- `checklist.md` — requirements quality checklist ("unit tests for English")
+  to run before writing tasks.md.
+- `SDD.md` — workflow reference with analyze and converge phases.
+
+Replace these placeholders:
 - `{project_build_cmd}` → Actual build command (e.g., `npm run build`, `./gradlew assembleDebug`)
 - `{project_test_cmd}` → Actual test command (e.g., `npm test`, `./gradlew testDebug`)
 - `{tech_stack}` → Language and framework (e.g., "React + TypeScript", "Java + Android")
@@ -135,12 +162,16 @@ The trigger section:
 
 When the user describes a new feature (creates, builds, adds, wants a new screen,
 etc.), follow the spec-driven development workflow in `specs/SDD.md`. Read
-`MEMORY.md` before writing any spec to avoid repeating known bugs. The workflow:
+`MEMORY.md` before writing any spec to avoid repeating known bugs. Check
+`constitution.md` for governing principles. The workflow:
 1. Generate mockups if needed (`canvas-design` + `theme-factory`)
-2. Co-author spec + plan (`doc-coauthoring`)
-3. Write test plan and tasks
-4. Implement one commit per task
-5. Write takeaways → promote to `MEMORY.md`
+2. Co-author spec + plan (`doc-coauthoring`); resolve all `[NEEDS CLARIFICATION]` markers
+3. Run requirements quality checklist
+4. Write test plan and tasks
+5. Run cross-artifact analysis (spec ↔ plan ↔ tasks)
+6. Implement one commit per task
+7. Run convergence check (assess codebase against spec/plan/tasks)
+8. Write takeaways → promote to `MEMORY.md`
 ```
 
 ### Step 6: Customize specs/SDD.md
@@ -155,6 +186,10 @@ Write `specs/SDD.md` by copying `assets/templates/SDD.md` and replacing:
 After setup, summarize what was created and how to use it:
 - How to start a new feature (just describe it)
 - Where feature specs live (`specs/NNN-feature-name/`)
+- How `constitution.md` gates every feature via plan.md's Constitution Check
+- How the requirements quality checklist catches gaps before implementation
+- How cross-artifact analysis catches spec/plan/tasks inconsistencies
+- How post-implementation convergence detects gaps against the original spec
 - How MEMORY.md evolves (takeaways → curate → promote)
 - That `codebase-to-sdd-knowledge` can populate MEMORY.md and generate a
   `knowledge/` directory from existing code when setting up SDD on a project
@@ -171,6 +206,8 @@ project's conventions:
 - If the project has strict commit message conventions, reflect them in tasks.md
 - If features often involve UI changes, emphasize the UX/UI section in spec.md
 - For CLI/API projects, replace UX/UI with API contract or CLI interface section
+- Review and amend the constitution articles through the Amendment Log —
+  the defaults are opinionated, not universal
 
 ## What NOT to Change
 
@@ -181,15 +218,21 @@ project's conventions:
 - One task = one commit (build + test must pass per task)
 - `index.md` tracks file conflicts via the `touches` column
 - `plan.md` frontmatter is machine-parseable — keep the YAML structure
+- `constitution.md` articles are immutable between amendment cycles — do not
+  weaken or remove a gate without Amendment Log documentation
 
 ## References
 
 - `assets/templates/SDD.md` — Workflow reference template
+- `assets/templates/constitution.md` — Governing principles template (7 articles)
 - `assets/templates/MEMORY.md` — Starting memory template
-- `assets/templates/plan.md` — Feature plan template (with frontmatter)
-- `assets/templates/spec.md` — Specification template
+- `assets/templates/plan.md` — Feature plan template (with frontmatter + constitution gates)
+- `assets/templates/spec.md` — Specification template (prioritized stories + NEEDS CLARIFICATION)
 - `assets/templates/tasks.md` — Task checklist template
 - `assets/templates/test_plan.md` — Test plan template
+- `assets/templates/checklist.md` — Requirements quality checklist ("unit tests for English")
 - `assets/templates/takeaways.md` — Feature takeaways template
 - `assets/templates/index.md` — Feature index template
+- `assets/references/analyze.md` — Cross-artifact consistency analysis
+- `assets/references/converge.md` — Post-implementation gap detection
 - `self-evolving-memory/references/entry-format.md` — Enriched MEMORY.md entry format (use when `memory/meta.json` exists)
